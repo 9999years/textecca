@@ -17,6 +17,78 @@ use nom_locate::{position, LocatedSpan};
 pub type Span<'input, Extra = ()> = LocatedSpan<&'input str, Extra>;
 pub type Error<'input, Extra = ()> = VerboseError<Span<'input, Extra>>;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Paragraph<'input> {
+    pub content: Span<'input>,
+    pub sep: Span<'input>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParseTree<'input> {
+    pub paragraphs: Vec<Paragraph<'input>>,
+}
+
+/// An element within a `Block`; either a child block or a stretch of text.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlockElem<'input> {
+    Text(Span<'input>),
+    Child(Block<'input>),
+}
+
+/// A block indented to a particular level.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Block<'input> {
+    /// This block's starting position.
+    pub position: Span<'input>,
+
+    /// This block's indent. Each element in the vector represents one nested
+    /// block.
+    ///
+    /// Since we need to parse the entire indent every line, we duplicate this
+    /// information in each block.
+    ///
+    /// `indent` will be empty if and only if this block is top-level.
+    pub indent: Vec<&'input str>,
+
+    /// This block's children.
+    pub children: Vec<BlockElem<'input>>,
+}
+
+/// A change in indentation from a given block.
+enum IndentChange<'input> {
+    /// Extra indentation found; indicates a nested block.
+    More(Span<'input>),
+
+    /// Less indentation found, corresponding to an outer block. The integer
+    /// indicates the number of blocks closed.
+    Less(u32),
+
+    /// Less indentation found, not corresponding to any outer block; an error
+    /// condition. The Span is the indentation found.
+    Err(Span<'input>),
+
+    /// No change in indentation found; indicates text in the current block.
+    None,
+}
+
+impl<'i> Block<'i> {
+    /// Recognizes this block's indent at the start of a line.
+    fn parse_indent<E: ParseError<Span<'i>>>(&self, i: Span<'i>) -> IResult<Span, IndentChange, E> {
+        let mut rest = i;
+        for chunk in &self.indent {
+            rest = tag(*chunk)(rest)?.0;
+        }
+        Ok((rest, IndentChange::None))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct BlockParser<'input> {
+    indent: &'input str,
+}
+
+impl<'i> BlockParser<'i> {}
+
 /// Drops the result of a parser.
 fn drop<I, O, E, F>(f: F) -> impl Fn(I) -> IResult<I, (), E>
 where
@@ -35,6 +107,11 @@ fn eof<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, (), E> {
 /// Recognizes a non-empty span of inline whitespace, i.e. tabs and spaces.
 fn inline_whitespace<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span, E> {
     recognize(many1(one_of(" \t")))(i)
+}
+
+/// Recognizes a non-empty span of inline whitespace, i.e. tabs and spaces.
+fn indent<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span, E> {
+    recognize(pair(many0(take_char('\t')), many0(take_char(' '))))(i)
 }
 
 /// Recognizes a non-empty span of inline printing characters, i.e. anything
@@ -72,12 +149,6 @@ fn nonempty_lines<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Vec
     context("lines", separated_nonempty_list(newline, nonempty_line))(i)
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Paragraph<'input> {
-    pub content: Span<'input>,
-    pub sep: Span<'input>,
-}
-
 /// Recognizes a separator between paragraphs, which is *either*:
 /// - Any sequence of one or more blank lines. Note that blank lines may include inline whitespace.
 /// - Any amount of whitespace, followed by the end of input.
@@ -104,11 +175,6 @@ fn paragraph<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Paragrap
             |(content, sep)| Paragraph { content, sep },
         ),
     )(i)
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParseTree<'input> {
-    pub paragraphs: Vec<Paragraph<'input>>,
 }
 
 /// Parses the given string as textecca code.

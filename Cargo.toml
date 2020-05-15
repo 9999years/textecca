@@ -14,9 +14,16 @@ nom = "5.1.1"  # Parsing.
 nom_locate = "2.0.0"  # Parser spans.
 wyz = "0.2.0"  # Utils. (Thanks so much for this one, myrrlyn!)
 html5ever = "0.25.0"  # HTML parsing/serialization.
+unicode-segmentation = "1.6.0"
+ucd-util = "0.1.8"
+ucd-trie = "0.1.3"
+# structopt = "0.3.14"
 # ammonia = "3" # HTML sanitization.
 # textwrap = "0.11" # word wrapping, indenting, deindenting
 # Inflector = "0.11"  # String casing / transformations.
+# tantivy = "0.12.0"  # Search engine lib
+# noise_search = "0.7.0"  # Search engine w/ interesting query lang
+# rust_stemmers = "1.2.0" # Stemming for multiple languages
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"  # Better assert_eq! and assert_ne! macros.
