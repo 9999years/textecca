@@ -14,7 +14,8 @@ use nom::{
 #[allow(unused_imports)]
 use nom_locate::{position, LocatedSpan};
 
-type Span<'input, Extra = ()> = LocatedSpan<&'input str, Extra>;
+pub type Span<'input, Extra = ()> = LocatedSpan<&'input str, Extra>;
+pub type Error<'input, Extra = ()> = VerboseError<Span<'input, Extra>>;
 
 /// Drops the result of a parser.
 fn drop<I, O, E, F>(f: F) -> impl Fn(I) -> IResult<I, (), E>
@@ -73,8 +74,8 @@ fn nonempty_lines<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Vec
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Paragraph<'input> {
-    content: Span<'input>,
-    sep: Span<'input>,
+    pub content: Span<'input>,
+    pub sep: Span<'input>,
 }
 
 /// Recognizes a separator between paragraphs, which is *either*:
@@ -107,7 +108,7 @@ fn paragraph<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Paragrap
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseTree<'input> {
-    paragraphs: Vec<Paragraph<'input>>,
+    pub paragraphs: Vec<Paragraph<'input>>,
 }
 
 /// Parses the given string as textecca code.
