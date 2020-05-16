@@ -50,5 +50,5 @@ let
 
 in {
   inherit ucd ucd-generate;
-  ucd-general-category = ucd-general-category { categories = "N,P,S"; };
+  ucd-general-category = ucd-general-category { categories = "N,P,S,Zs"; };
 }
