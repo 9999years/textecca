@@ -1,6 +1,3 @@
-#![allow(dead_code)] // TODO: Remove when parser works reasonably.
-
-#[allow(unused_imports)]
 use nom::{
     branch::alt,
     bytes::complete::{tag, take as take_bytes},
@@ -11,7 +8,6 @@ use nom::{
     sequence::{pair, preceded, terminated, tuple},
     IResult,
 };
-#[allow(unused_imports)]
 use nom_locate::{position, LocatedSpan};
 
 pub type Span<'input, Extra = ()> = LocatedSpan<&'input str, Extra>;
@@ -192,6 +188,7 @@ mod test {
     use wyz::Conv;
 
     use super::*;
+    use crate::test_util::Input;
 
     fn lines_count<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, usize, E> {
         map(separated_nonempty_list(newline, nonempty_line), |lines| {
@@ -199,50 +196,11 @@ mod test {
         })(i)
     }
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
-    struct Input {
-        input: &'static str,
-    }
-
-    impl Input {
-        fn new(input: &'static str) -> Self {
-            Self { input }
-        }
-
-        /// This fragment as a Span, i.e. with offset 0.
-        fn as_span(&self) -> Span {
-            self.span(0, self.input.len(), 1)
-        }
-
-        /// The Span at this fragment's end.
-        fn span_eof(&self, line: u32) -> Span {
-            unsafe { Span::new_from_raw_offset(self.input.len(), line, "", ()) }
-        }
-
-        /// Get a span from a given offset and line number, for testing purposes.
-        /// Panics if `offset` is not a valid index into `self.input`.
-        fn span(&self, offset: usize, length: usize, line: u32) -> Span {
-            if offset >= self.input.len() {
-                panic!("Bad offset into Input; for EOF use span_eof.");
-            }
-            // Safety: We've verified offset is a valid index.
-            unsafe {
-                Span::new_from_raw_offset(offset, line, &self.input[offset..offset + length], ())
-            }
-        }
-    }
-
-    impl Into<&'static str> for Input {
-        fn into(self) -> &'static str {
-            self.input
-        }
-    }
-
     #[test]
     fn parse_empty() {
         let input = Input::new("");
         assert_eq!(
-            Ok((input.span_eof(1), ParseTree { paragraphs: vec![] })),
+            Ok((input.eof(), ParseTree { paragraphs: vec![] })),
             parse::<'_, VerboseError<_>>(input.into())
         );
     }
@@ -254,7 +212,7 @@ mod test {
             ParseTree {
                 paragraphs: vec![Paragraph {
                     content: input.as_span(),
-                    sep: input.span_eof(1),
+                    sep: input.eof(),
                 }]
             },
             parse::<'_, VerboseError<_>>(input.into()).unwrap().1
@@ -266,11 +224,11 @@ mod test {
         let input = Input::new("a paragraph with line-endings\n\n");
         assert_eq!(
             Ok((
-                input.span_eof(3),
+                input.eof(),
                 ParseTree {
                     paragraphs: vec![Paragraph {
-                        content: input.span(0, 29, 1),
-                        sep: input.span(29, 2, 1),
+                        content: input.offset_len(0, 29),
+                        sep: input.offset_len(29, 2),
                     }]
                 }
             )),
@@ -297,24 +255,24 @@ mod test {
         println!("{:#?}", input.conv::<&str>());
         assert_eq!(
             Ok((
-                input.span_eof(10),
+                input.eof(),
                 ParseTree {
                     paragraphs: vec![
                         Paragraph {
-                            content: input.span(0, 51, 1),
-                            sep: input.span(51, 2, 2),
+                            content: input.offset_len(0, 51),
+                            sep: input.offset_len(51, 2),
                         },
                         Paragraph {
-                            content: input.span(53, 21, 4),
-                            sep: input.span(74, 3, 4),
+                            content: input.offset_len(53, 21),
+                            sep: input.offset_len(74, 3),
                         },
                         Paragraph {
-                            content: input.span(77, 40, 7),
-                            sep: input.span(117, 2, 7),
+                            content: input.offset_len(77, 40),
+                            sep: input.offset_len(117, 2),
                         },
                         Paragraph {
-                            content: input.span(119, 27, 9),
-                            sep: input.span(146, 1, 9),
+                            content: input.offset_len(119, 27),
+                            sep: input.offset_len(146, 1),
                         },
                     ]
                 }
@@ -330,16 +288,16 @@ mod test {
         ));
         assert_eq!(
             Ok((
-                input.span_eof(10),
+                input.eof(),
                 ParseTree {
                     paragraphs: vec![
                         Paragraph {
-                            content: input.span(0, 35, 1),
-                            sep: input.span(35, 26, 1),
+                            content: input.offset_len(0, 35),
+                            sep: input.offset_len(35, 26),
                         },
                         Paragraph {
-                            content: input.span(61, 91, 8),
-                            sep: input.span(152, 1, 9),
+                            content: input.offset_len(61, 91),
+                            sep: input.offset_len(152, 1),
                         }
                     ]
                 }

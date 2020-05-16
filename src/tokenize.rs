@@ -1,14 +1,15 @@
-#[allow(unused_imports)]
 use nom::{
     branch::alt,
     bytes::complete::{tag, take as take_bytes},
     character::complete::{anychar, char as take_char, none_of, one_of},
     combinator::{
-        all_consuming, complete, cut, map, map_parser, not, opt, peek, recognize, rest_len, value,
-        verify,
+        all_consuming, complete, cut, iterator, map, map_parser, not, opt, peek, recognize,
+        rest_len, value, verify,
     },
     error::{context, make_error, ErrorKind, ParseError, VerboseError},
-    multi::{fold_many0, many0, many1, many1_count, many_till, separated_nonempty_list},
+    multi::{
+        fold_many0, many0, many0_count, many1, many1_count, many_till, separated_nonempty_list,
+    },
     sequence::{pair, preceded, terminated, tuple},
     IResult,
 };
@@ -16,7 +17,7 @@ use nom_locate::position;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::parse_util::{
-    eof, is_inline_space, is_number, is_punctuation, is_symbol, next_word_bound,
+    drop_parser, eof, is_inline_space, is_number, is_punctuation, is_symbol, next_word_bound,
     peek_printing_char, take_inline_space1, take_number1, take_punctuation1, take_symbol1,
 };
 use crate::Span;
@@ -90,6 +91,7 @@ pub struct Tokens<'i> {
 #[derive(Debug, Clone, Default, PartialEq)]
 struct Tokenizer<'i> {
     indent: Vec<&'i str>,
+    toks: Vec<Token<'i>>,
 }
 
 impl<'i> Tokenizer<'i> {
@@ -111,9 +113,14 @@ impl<'i> Tokenizer<'i> {
         )(i)
     }
 
-    fn parse_after_indent<E: ParseError<Span<'i>>>(i: Span<'i>) -> IResult<Span, Vec<Token>, E> {
-        map(
-            many_till(
+    fn parse_after_indent<E: ParseError<Span<'i>> + Clone>(
+        &mut self,
+        i: Span<'i>,
+    ) -> IResult<Span<'i>, (), E> {
+        let mut it = iterator(
+            i,
+            pair(
+                not(Self::parse_immediate_newline),
                 map(next_word_bound, |chunk| {
                     let c = chunk.fragment().chars().next().unwrap();
                     if is_punctuation(c) || is_symbol(c) {
@@ -126,10 +133,12 @@ impl<'i> Tokenizer<'i> {
                         Token::Word(chunk)
                     }
                 }),
-                Self::parse_immediate_newline,
             ),
-            |(toks, _)| toks,
-        )(i)
+        );
+        for ((), tok) in &mut it {
+            self.toks.push(tok);
+        }
+        it.finish()
     }
 
     /// Recognizes indentation at the start of a line.
@@ -138,11 +147,13 @@ impl<'i> Tokenizer<'i> {
     ///
     /// `None` indicates no change in indentation.
     fn parse_indent<E: ParseError<Span<'i>>>(
-        &self,
+        &mut self,
         i: Span<'i>,
-    ) -> IResult<Span, Option<Token>, E> {
+    ) -> IResult<Span<'i>, Option<Token<'i>>, E> {
         let mut rest = i;
         for (i, chunk) in self.indent.iter().enumerate() {
+            println!("Parsing indent chunk number {}, {:#?}", i, chunk);
+            dbg!(rest);
             let (next_rest, deindent) = alt((
                 // The next chunk of indentation.
                 value(None, tag(*chunk)),
@@ -158,7 +169,11 @@ impl<'i> Tokenizer<'i> {
                 ),
             ))(rest)?;
 
-            if deindent.is_some() {
+            if let Some(tok) = &deindent {
+                if let Token::Deindent(count) = tok {
+                    dbg!(&self.indent);
+                    self.indent.truncate(self.indent.len() - count);
+                }
                 return Ok((next_rest, deindent));
             }
 
@@ -182,58 +197,168 @@ impl<'i> Tokenizer<'i> {
         ))(rest)
     }
 
-    fn parse_line<E: ParseError<Span<'i>>>(&self, i: Span<'i>) -> IResult<Span, Vec<Token>, E> {
+    fn parse_line<E: ParseError<Span<'i>> + Clone>(
+        &mut self,
+        i: Span<'i>,
+    ) -> IResult<Span<'i>, (), E> {
         let (rest, maybe_tok) = self.parse_indent(i)?;
 
         if let Some(Token::Newline(span)) = maybe_tok {
-            return Ok((rest, vec![Token::BlankLines(BlankLines { span, count: 1 })]));
+            self.toks
+                .push(Token::BlankLines(BlankLines { span, count: 1 }));
+            return Ok((rest, ()));
         }
 
-        let mut ret = Vec::new();
         if let Some(tok) = maybe_tok {
-            ret.push(tok);
+            self.toks.push(tok);
         }
 
-        let (rest, toks) = Self::parse_after_indent(rest)?;
-
-        ret.extend(toks);
+        let (rest, ()) = self.parse_after_indent(rest)?;
 
         let (rest, newline) = alt((Self::parse_immediate_newline, recognize(eof)))(rest)?;
 
-        ret.push(Token::Newline(newline));
-        Ok((rest, ret))
+        self.toks.push(Token::Newline(newline));
+        Ok((rest, ()))
     }
 
-    fn tokenize<'input: 'i, E: ParseError<Span<'i>>>(
+    fn tokenize<E: ParseError<Span<'i>> + Clone>(
         &mut self,
         input: Span<'i>,
-    ) -> IResult<Span<'i>, Tokens<'i>, E> {
-        map(
-            fold_many0(
-                |i: Span<'i>| self.parse_line(i),
-                Vec::new(),
-                |mut acc, toks| {
-                    acc.extend(toks);
-                    acc
-                },
-            ),
-            |toks| Tokens { toks },
-        )(input)
+    ) -> IResult<Span<'i>, (), E> {
+        // complete(drop_parser(many0_count(|i: Span<'i>| self.parse_line(i))))(input)
+        let mut rest = input;
+        while !rest.fragment().is_empty() {
+            let (next_rest, ()) = self.parse_line(rest)?;
+            rest = next_rest;
+        }
+        Ok((rest, ()))
     }
-
-    // fn eof<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, (), E> {
-    //     not(take_bytes(1usize))(i)
-    // }
 }
 
-pub fn tokenize<'i, E: ParseError<Span<'i>>>(input: Span<'i>) -> IResult<Span, Tokens, E> {
+impl<'i> Into<Tokens<'i>> for Tokenizer<'i> {
+    fn into(self) -> Tokens<'i> {
+        Tokens { toks: self.toks }
+    }
+}
+
+pub fn tokenize_parser<'i, E: ParseError<Span<'i>> + Clone>(
+    input: Span<'i>,
+) -> IResult<Span, Tokens, E> {
     let mut tokenizer = Tokenizer::new();
-    tokenizer.tokenize(input)
+    let (rest, ()) = tokenizer.tokenize(input)?;
+    Ok((rest, tokenizer.into()))
+}
+
+pub fn tokenize<'i, E: ParseError<Span<'i>> + Clone>(
+    input: Span<'i>,
+) -> Result<Tokens, nom::Err<E>> {
+    tokenize_parser(input).map(|(_, toks)| toks)
 }
 
 #[cfg(test)]
 mod test {
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     use super::*;
+    use crate::test_util::Input;
+
+    macro_rules! assert_toks {
+        ($input_name:ident, $toks:expr, $input:expr $(,)?) => {
+            let $input_name = Input::new($input);
+            assert_eq!(
+                Ok(Tokens { toks: $toks }),
+                tokenize::<VerboseError<_>>($input_name.as_span())
+            );
+        };
+    }
+
+    #[test]
+    fn tokenize_simple() {
+        assert_toks!(
+            input,
+            vec![Token::Word(input.slice(0..3)), Token::Newline(input.eof()),],
+            "xxx",
+        );
+
+        assert_toks!(input, vec![], "",);
+
+        assert_toks!(
+            input,
+            vec![
+                Token::Word(input.slice(0..3)),
+                Token::Newline(input.slice(3..)),
+            ],
+            "xxx\n",
+        );
+
+        // assert_toks!(
+        //     input,
+        //     vec![
+        //         Token::Word(input.slice(0..3)),
+        //         Token::BlankLines(BlankLines {
+        //             span: input.slice(3..),
+        //             count: 1,
+        //         }),
+        //     ],
+        //     "xxx\n\n",
+        // );
+    }
+
+    #[test]
+    fn tokenize_indent() {
+        assert_toks!(
+            input,
+            vec![
+                Token::Word(input.offset(0, "no_indent")),
+                Token::Newline(input.offset(9, "\n")),
+                Token::Indent(input.offset(10, "    ")),
+                Token::Word(input.offset(14, "indent")),
+                Token::Newline(input.offset(20, "\n")),
+                Token::Deindent(1),
+                Token::Word(input.offset(21, "deindent_1")),
+                Token::Newline(input.offset(31, "\n")),
+                Token::Word(input.offset(32, "same_indent")),
+                Token::Newline(input.offset(43, "\n")),
+            ],
+            indoc!(
+                r#"
+                no_indent
+                    indent
+                deindent_1
+                same_indent
+                "#
+            )
+        );
+
+        // This should fail!
+        assert_toks!(
+            input,
+            vec![],
+            indoc!(
+                r#"
+                no_indent
+                    extra_indent
+                  error
+                "#
+            )
+        );
+
+        assert_toks!(
+            input,
+            vec![],
+            indoc!(
+                r#"
+                no_indent
+                    extra_indent
+                        extra_indent
+                    deindent_1
+                    same_indent
+                            extra_indent
+                deindent_2
+                same_indent
+                "#
+            )
+        );
+    }
 }

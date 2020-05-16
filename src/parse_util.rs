@@ -1,16 +1,14 @@
-#[allow(unused_imports)]
 use nom::{
     branch::alt,
     bytes::complete::{tag, take as take_bytes},
     bytes::streaming::{take_while, take_while1},
     character::complete::{anychar, char as take_char, none_of, one_of},
-    combinator::{all_consuming, complete, cut, map, not, opt, recognize, rest_len, verify},
+    combinator::{all_consuming, complete, cut, map, not, opt, recognize, rest_len, value, verify},
     error::{context, make_error, ErrorKind, ParseError, VerboseError},
     multi::{many0, many1, many1_count, separated_nonempty_list},
     sequence::{pair, preceded, terminated, tuple},
     IResult, Slice,
 };
-#[allow(unused_imports)]
 use nom_locate::{position, LocatedSpan};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -20,13 +18,13 @@ pub type Span<'input, Extra = ()> = LocatedSpan<&'input str, Extra>;
 pub type Error<'input, Extra = ()> = VerboseError<Span<'input, Extra>>;
 
 /// Drops the result of a parser.
-pub fn drop<I, O, E, F>(f: F) -> impl Fn(I) -> IResult<I, (), E>
+pub fn drop_parser<I, O, E, F>(f: F) -> impl Fn(I) -> IResult<I, (), E>
 where
     I: Clone,
     E: ParseError<I>,
     F: Fn(I) -> IResult<I, O, E>,
 {
-    map(f, |_| ())
+    value((), f)
 }
 
 /// Succeeds if there's no remaining input, errors otherwise.
