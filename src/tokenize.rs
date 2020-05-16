@@ -152,8 +152,6 @@ impl<'i> Tokenizer<'i> {
     ) -> IResult<Span<'i>, Option<Token<'i>>, E> {
         let mut rest = i;
         for (i, chunk) in self.indent.iter().enumerate() {
-            println!("Parsing indent chunk number {}, {:#?}", i, chunk);
-            dbg!(rest);
             let (next_rest, deindent) = alt((
                 // The next chunk of indentation.
                 value(None, tag(*chunk)),
@@ -169,11 +167,7 @@ impl<'i> Tokenizer<'i> {
                 ),
             ))(rest)?;
 
-            if let Some(tok) = &deindent {
-                if let Token::Deindent(count) = tok {
-                    dbg!(&self.indent);
-                    self.indent.truncate(self.indent.len() - count);
-                }
+            if deindent.is_some() {
                 return Ok((next_rest, deindent));
             }
 
@@ -210,6 +204,17 @@ impl<'i> Tokenizer<'i> {
         }
 
         if let Some(tok) = maybe_tok {
+            match tok {
+                Token::Indent(span) => {
+                    self.indent.push(span.fragment());
+                }
+                Token::Deindent(count) => {
+                    self.indent.truncate(self.indent.len() - count);
+                }
+                _ => {
+                    unreachable!();
+                }
+            }
             self.toks.push(tok);
         }
 
@@ -273,6 +278,13 @@ mod test {
         };
     }
 
+    macro_rules! assert_toks_err {
+        ($input:expr $(,)?) => {
+            let input = Input::new($input);
+            assert!(tokenize::<VerboseError<_>>(input.as_span()).is_err());
+        };
+    }
+
     #[test]
     fn tokenize_simple() {
         assert_toks!(
@@ -331,22 +343,40 @@ mod test {
             )
         );
 
-        // This should fail!
-        assert_toks!(
-            input,
-            vec![],
-            indoc!(
-                r#"
+        // Indentation error!
+        assert_toks_err!(indoc!(
+            r#"
                 no_indent
                     extra_indent
                   error
                 "#
-            )
-        );
+        ));
 
         assert_toks!(
             input,
-            vec![],
+            vec![
+                Token::Word(input.offset(0, "no_indent",)),
+                Token::Newline(input.offset(9, "\n",)),
+                Token::Indent(input.offset(10, "    ",)),
+                Token::Word(input.offset(14, "extra_indent",)),
+                Token::Newline(input.offset(26, "\n",)),
+                Token::Indent(input.offset(31, "    ",)),
+                Token::Word(input.offset(35, "extra_indent",)),
+                Token::Newline(input.offset(47, "\n",)),
+                Token::Deindent(1),
+                Token::Word(input.offset(52, "deindent_1",)),
+                Token::Newline(input.offset(62, "\n",)),
+                Token::Word(input.offset(67, "same_indent",)),
+                Token::Newline(input.offset(78, "\n",)),
+                Token::Indent(input.offset(83, "        ",)),
+                Token::Word(input.offset(91, "extra_indent",)),
+                Token::Newline(input.offset(103, "\n",)),
+                Token::Deindent(2),
+                Token::Word(input.offset(104, "deindent_2",)),
+                Token::Newline(input.offset(114, "\n",)),
+                Token::Word(input.offset(115, "same_indent",)),
+                Token::Newline(input.offset(126, "\n",)),
+            ],
             indoc!(
                 r#"
                 no_indent
@@ -361,4 +391,45 @@ mod test {
             )
         );
     }
+
+    #[test]
+    fn tokenize_words() {
+        assert_toks!(
+            input,
+            vec![
+                Token::Word(input.offset(0, "this")),
+                Token::Space(input.offset(4, " ")),
+                Token::Word(input.offset(5, "string's")),
+                Token::Space(input.offset(13, " ")),
+                Token::Word(input.offset(14, "gonna")),
+                Token::Space(input.offset(19, " ")),
+                Token::Word(input.offset(20, "be")),
+                Token::Space(input.offset(22, " ")),
+                Token::Word(input.offset(23, "split")),
+                Token::Space(input.offset(28, " ")),
+                Token::Word(input.offset(29, "in2")),
+                Token::Space(input.offset(32, " ")),
+                Token::Word(input.offset(33, "several")),
+                Token::Punct(input.offset(40, "-")),
+                Token::Word(input.offset(41, "different")),
+                Token::Punct(input.offset(50, "-")),
+                Token::Word(input.offset(51, "tokens")),
+                Token::Newline(input.offset(57, "\n")),
+            ],
+            "this string's gonna be split in2 several-different-tokens\n"
+        );
+    }
+
+    assert_toks!(
+        input,
+        vec![
+            Token::Num(input.offset(0, "1,000,000")),
+            Token::Space(input.offset(9, " ")),
+            Token::Num(input.offset(10, "9_876_543")),
+            Token::Space(input.offset(19, " ")),
+            Token::Num(input.offset(20, "20.34")),
+            Token::Newline(input.offset(25, "\n")),
+        ],
+        "1,000,000 9_876_543 20.34\n",
+    );
 }
