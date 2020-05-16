@@ -85,10 +85,19 @@ pub fn peek_printing_char<'i, E: ParseError<Span<'i>>>(i: Span<'i>) -> IResult<S
     not(verify(anychar, |c| is_inline_space(*c)))(i)
 }
 
-/// Succeeds if the next character is not whitespace.
+/// Returns the slice up to the next Unicode word boundary.
 pub fn next_word_bound<'i, E: ParseError<Span<'i>>>(i: Span<'i>) -> IResult<Span, Span, E> {
     match i.fragment().split_word_bounds().next() {
         Some(chunk) => Ok((i.slice(chunk.len()..), i.slice(..chunk.len()))),
+        // TODO: Should this be `Incomplete` instead?
+        None => Err(nom::Err::Error(make_error(i, ErrorKind::Eof))),
+    }
+}
+
+/// Returns the slice up to the next EGC boundary.
+pub fn next_egc_bound<'i, E: ParseError<Span<'i>>>(i: Span<'i>) -> IResult<Span, Span, E> {
+    match i.fragment().grapheme_indices(/* extended = */ true).next() {
+        Some((_, chunk)) => Ok((i.slice(chunk.len()..), i.slice(..chunk.len()))),
         // TODO: Should this be `Incomplete` instead?
         None => Err(nom::Err::Error(make_error(i, ErrorKind::Eof))),
     }

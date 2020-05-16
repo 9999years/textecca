@@ -11,13 +11,13 @@ use nom::{
         fold_many0, many0, many0_count, many1, many1_count, many_till, separated_nonempty_list,
     },
     sequence::{pair, preceded, terminated, tuple},
-    IResult,
+    IResult, Slice,
 };
 use nom_locate::position;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::parse_util::{
-    drop_parser, eof, is_inline_space, is_number, is_punctuation, is_symbol, next_word_bound,
+    drop_parser, eof, is_inline_space, is_number, is_punctuation, is_symbol, next_egc_bound,
     peek_printing_char, take_inline_space1, take_number1, take_punctuation1, take_symbol1,
 };
 use crate::Span;
@@ -117,27 +117,72 @@ impl<'i> Tokenizer<'i> {
         &mut self,
         i: Span<'i>,
     ) -> IResult<Span<'i>, (), E> {
+        #[derive(Clone, Copy, PartialEq, Debug)]
+        enum TokenType {
+            Punct,
+            Num,
+            Space,
+            Word,
+        }
+
+        impl From<char> for TokenType {
+            fn from(c: char) -> Self {
+                if is_punctuation(c) || is_symbol(c) {
+                    TokenType::Punct
+                } else if is_number(c) {
+                    TokenType::Num
+                } else if is_inline_space(c) {
+                    TokenType::Space
+                } else {
+                    TokenType::Word
+                }
+            }
+        }
+
+        let mut push_current_tok = |ty, ofs, len: usize| {
+            let span = i.slice(ofs..ofs + len);
+            self.toks.push(match ty {
+                TokenType::Punct => Token::Punct(span),
+                TokenType::Num => Token::Num(span),
+                TokenType::Space => Token::Space(span),
+                TokenType::Word => Token::Word(span),
+            });
+        };
+
+        let mut starting_offset = 0;
+        let mut chunk_len = 0;
+        let mut current: Option<TokenType> = None;
+
         let mut it = iterator(
             i,
-            pair(
-                not(Self::parse_immediate_newline),
-                map(next_word_bound, |chunk| {
-                    let c = chunk.fragment().chars().next().unwrap();
-                    if is_punctuation(c) || is_symbol(c) {
-                        Token::Punct(chunk)
-                    } else if is_number(c) {
-                        Token::Num(chunk)
-                    } else if is_inline_space(c) {
-                        Token::Space(chunk)
-                    } else {
-                        Token::Word(chunk)
-                    }
-                }),
-            ),
+            preceded(not(Self::parse_immediate_newline), next_egc_bound),
         );
-        for ((), tok) in &mut it {
-            self.toks.push(tok);
+        for egc in &mut it {
+            let c = egc.fragment().chars().next().unwrap();
+            let egc_type = c.into();
+
+            let chunk_type = match current {
+                None => {
+                    current = Some(egc_type);
+                    egc_type
+                }
+                Some(ty) => ty,
+            };
+
+            if chunk_type != egc_type {
+                push_current_tok(chunk_type, starting_offset, chunk_len);
+                starting_offset += chunk_len;
+                chunk_len = 0;
+                current = Some(egc_type);
+            }
+
+            chunk_len += egc.fragment().len();
         }
+
+        if let Some(chunk_type) = current {
+            push_current_tok(chunk_type, starting_offset, chunk_len);
+        }
+
         it.finish()
     }
 
@@ -322,15 +367,21 @@ mod test {
         assert_toks!(
             input,
             vec![
-                Token::Word(input.offset(0, "no_indent")),
+                Token::Word(input.offset(0, "no")),
+                Token::Punct(input.offset(2, "_")),
+                Token::Word(input.offset(3, "indent")),
                 Token::Newline(input.offset(9, "\n")),
                 Token::Indent(input.offset(10, "    ")),
                 Token::Word(input.offset(14, "indent")),
                 Token::Newline(input.offset(20, "\n")),
                 Token::Deindent(1),
-                Token::Word(input.offset(21, "deindent_1")),
+                Token::Word(input.offset(21, "deindent")),
+                Token::Punct(input.offset(29, "_")),
+                Token::Num(input.offset(30, "1")),
                 Token::Newline(input.offset(31, "\n")),
-                Token::Word(input.offset(32, "same_indent")),
+                Token::Word(input.offset(32, "same")),
+                Token::Punct(input.offset(36, "_")),
+                Token::Word(input.offset(37, "indent")),
                 Token::Newline(input.offset(43, "\n")),
             ],
             indoc!(
@@ -355,26 +406,42 @@ mod test {
         assert_toks!(
             input,
             vec![
-                Token::Word(input.offset(0, "no_indent",)),
+                Token::Word(input.offset(0, "no",)),
+                Token::Punct(input.offset(2, "_",)),
+                Token::Word(input.offset(3, "indent",)),
                 Token::Newline(input.offset(9, "\n",)),
                 Token::Indent(input.offset(10, "    ",)),
-                Token::Word(input.offset(14, "extra_indent",)),
+                Token::Word(input.offset(14, "extra",)),
+                Token::Punct(input.offset(19, "_",)),
+                Token::Word(input.offset(20, "indent",)),
                 Token::Newline(input.offset(26, "\n",)),
                 Token::Indent(input.offset(31, "    ",)),
-                Token::Word(input.offset(35, "extra_indent",)),
+                Token::Word(input.offset(35, "extra",)),
+                Token::Punct(input.offset(40, "_",)),
+                Token::Word(input.offset(41, "indent",)),
                 Token::Newline(input.offset(47, "\n",)),
                 Token::Deindent(1),
-                Token::Word(input.offset(52, "deindent_1",)),
+                Token::Word(input.offset(52, "deindent",)),
+                Token::Punct(input.offset(60, "_",)),
+                Token::Num(input.offset(61, "1",)),
                 Token::Newline(input.offset(62, "\n",)),
-                Token::Word(input.offset(67, "same_indent",)),
+                Token::Word(input.offset(67, "same",)),
+                Token::Punct(input.offset(71, "_",)),
+                Token::Word(input.offset(72, "indent",)),
                 Token::Newline(input.offset(78, "\n",)),
                 Token::Indent(input.offset(83, "        ",)),
-                Token::Word(input.offset(91, "extra_indent",)),
+                Token::Word(input.offset(91, "extra",)),
+                Token::Punct(input.offset(96, "_",)),
+                Token::Word(input.offset(97, "indent",)),
                 Token::Newline(input.offset(103, "\n",)),
                 Token::Deindent(2),
-                Token::Word(input.offset(104, "deindent_2",)),
+                Token::Word(input.offset(104, "deindent",)),
+                Token::Space(input.offset(112, " ",)),
+                Token::Num(input.offset(113, "2",)),
                 Token::Newline(input.offset(114, "\n",)),
-                Token::Word(input.offset(115, "same_indent",)),
+                Token::Word(input.offset(115, "same",)),
+                Token::Punct(input.offset(119, "_",)),
+                Token::Word(input.offset(120, "indent",)),
                 Token::Newline(input.offset(126, "\n",)),
             ],
             indoc!(
@@ -385,7 +452,7 @@ mod test {
                     deindent_1
                     same_indent
                             extra_indent
-                deindent_2
+                deindent 2
                 same_indent
                 "#
             )
@@ -399,7 +466,9 @@ mod test {
             vec![
                 Token::Word(input.offset(0, "this")),
                 Token::Space(input.offset(4, " ")),
-                Token::Word(input.offset(5, "string's")),
+                Token::Word(input.offset(5, "string")),
+                Token::Punct(input.offset(11, "'")),
+                Token::Word(input.offset(12, "s")),
                 Token::Space(input.offset(13, " ")),
                 Token::Word(input.offset(14, "gonna")),
                 Token::Space(input.offset(19, " ")),
@@ -407,7 +476,8 @@ mod test {
                 Token::Space(input.offset(22, " ")),
                 Token::Word(input.offset(23, "split")),
                 Token::Space(input.offset(28, " ")),
-                Token::Word(input.offset(29, "in2")),
+                Token::Word(input.offset(29, "in")),
+                Token::Num(input.offset(31, "2")),
                 Token::Space(input.offset(32, " ")),
                 Token::Word(input.offset(33, "several")),
                 Token::Punct(input.offset(40, "-")),
@@ -416,20 +486,30 @@ mod test {
                 Token::Word(input.offset(51, "tokens")),
                 Token::Newline(input.offset(57, "\n")),
             ],
-            "this string's gonna be split in2 several-different-tokens\n"
+            "this string's gonna be split in2 several-different-tokens\n",
+        );
+
+        assert_toks!(
+            input,
+            vec![
+                Token::Num(input.offset(0, "1")),
+                Token::Punct(input.offset(1, ",")),
+                Token::Num(input.offset(2, "000")),
+                Token::Punct(input.offset(5, ",")),
+                Token::Num(input.offset(6, "000")),
+                Token::Space(input.offset(9, " ")),
+                Token::Num(input.offset(10, "9")),
+                Token::Punct(input.offset(11, "_")),
+                Token::Num(input.offset(12, "876")),
+                Token::Punct(input.offset(15, "_")),
+                Token::Num(input.offset(16, "543")),
+                Token::Space(input.offset(19, " ")),
+                Token::Num(input.offset(20, "20")),
+                Token::Punct(input.offset(22, ".")),
+                Token::Num(input.offset(23, "34")),
+                Token::Newline(input.offset(25, "\n")),
+            ],
+            "1,000,000 9_876_543 20.34\n",
         );
     }
-
-    assert_toks!(
-        input,
-        vec![
-            Token::Num(input.offset(0, "1,000,000")),
-            Token::Space(input.offset(9, " ")),
-            Token::Num(input.offset(10, "9_876_543")),
-            Token::Space(input.offset(19, " ")),
-            Token::Num(input.offset(20, "20.34")),
-            Token::Newline(input.offset(25, "\n")),
-        ],
-        "1,000,000 9_876_543 20.34\n",
-    );
 }

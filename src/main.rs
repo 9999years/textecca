@@ -16,7 +16,7 @@ fn main() -> io::Result<()> {
     io::stdin().read_to_string(&mut buf)?;
     let toks: Result<_, nom::Err<VerboseError<_>>> = tokenize(Span::new(&buf));
     // println!("{:#?}", toks);
-    println!("assert_toks!(\n    input,\n    vec![\n");
+    println!("assert_toks!(\n    input,\n    vec![");
     for tok in toks.unwrap().toks {
         println!(
             "        Token::{},",
