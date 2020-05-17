@@ -11,7 +11,7 @@ use nom::{
         fold_many0, many0, many0_count, many1, many1_count, many_till, separated_nonempty_list,
     },
     sequence::{pair, preceded, terminated, tuple},
-    IResult, Slice,
+    IResult, Offset, Slice,
 };
 use nom_locate::position;
 use unicode_segmentation::UnicodeSegmentation;
@@ -265,20 +265,69 @@ impl<'i> Tokenizer<'i> {
 
         let (rest, ()) = self.parse_after_indent(rest)?;
 
+        let blank_line = rest.location_offset() == i.location_offset();
+
         let (rest, newline) = alt((Self::parse_immediate_newline, recognize(eof)))(rest)?;
 
-        self.toks.push(Token::Newline(newline));
+        self.toks.push(if blank_line {
+            Token::BlankLines(BlankLines {
+                span: newline,
+                count: 1,
+            })
+        } else {
+            Token::Newline(newline)
+        });
         Ok((rest, ()))
+    }
+
+    /// If the last two elements of `self.toks` are both `Token::BlankLines`,
+    /// merge them into one `Token::BlankLines` using `input`.
+    ///
+    /// # Panics
+    /// If `input`'s offset to the second-to-last element of `self.toks` is not
+    /// 0.
+    fn merge_last_blanklines(&mut self, input: &Span<'i>) -> bool {
+        let len = self.toks.len();
+        let prev = match self.toks.get(len - 2) {
+            Some(Token::BlankLines(blanklines)) => blanklines,
+            _ => return false,
+        };
+        let last = match self.toks.get(len - 1) {
+            Some(Token::BlankLines(blanklines)) => blanklines,
+            _ => return false,
+        };
+
+        if input.offset(&prev.span) != 0 {
+            panic!(
+                "input = {} should have offset 0 to prev = {}.",
+                input, prev.span
+            );
+        }
+
+        let merged = Token::BlankLines(BlankLines {
+            span: input.slice(..prev.span.fragment().len() + last.span.fragment().len()),
+            count: prev.count + last.count,
+        });
+        self.toks.truncate(self.toks.len() - 2);
+        self.toks.push(merged);
+        true
     }
 
     fn tokenize<E: ParseError<Span<'i>> + Clone>(
         &mut self,
         input: Span<'i>,
     ) -> IResult<Span<'i>, (), E> {
-        // complete(drop_parser(many0_count(|i: Span<'i>| self.parse_line(i))))(input)
         let mut rest = input;
+        let mut prev_rest = input;
         while !rest.fragment().is_empty() {
             let (next_rest, ()) = self.parse_line(rest)?;
+            if !self.merge_last_blanklines(&prev_rest) {
+                // If we *didn't* merge the last two elements of `self.toks`,
+                // the remaining input after the *previous* iteration of this
+                // loop *will* be different in the next iteration.
+                // (Confusing, I know...)
+                prev_rest = rest;
+            }
             rest = next_rest;
         }
         Ok((rest, ()))
@@ -348,18 +397,24 @@ mod test {
             ],
             "xxx\n",
         );
+    }
 
-        // assert_toks!(
-        //     input,
-        //     vec![
-        //         Token::Word(input.slice(0..3)),
-        //         Token::BlankLines(BlankLines {
-        //             span: input.slice(3..),
-        //             count: 1,
-        //         }),
-        //     ],
-        //     "xxx\n\n",
-        // );
+    #[test]
+    fn blanklines() {
+        assert_toks!(
+            input,
+            vec![
+                Token::Punct(input.offset(0, "|||")),
+                Token::Newline(input.offset(3, "\n")),
+                Token::BlankLines(BlankLines {
+                    span: input.offset(4, "\n\n\n\n\n"),
+                    count: 5
+                }),
+                Token::Punct(input.offset(9, "|||")),
+                Token::Newline(input.offset(12, "")),
+            ],
+            "|||\n\n\n\n\n\n|||",
+        );
     }
 
     #[test]

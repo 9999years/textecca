@@ -4,7 +4,7 @@ use std::io::{self, Read};
 
 use nom::{error::VerboseError, IResult};
 
-use textecca::tokenize::{tokenize, Token};
+use textecca::tokenize::{tokenize, BlankLines, Token};
 use textecca::Span;
 
 fn span_to_test(s: Span) -> String {
@@ -27,6 +27,11 @@ fn main() -> io::Result<()> {
                 Token::Punct(span) => format!("Punct({})", span_to_test(span)),
                 Token::Num(span) => format!("Num({})", span_to_test(span)),
                 Token::Indent(span) => format!("Indent({})", span_to_test(span)),
+                Token::BlankLines(BlankLines { span, count }) => format!(
+                    "BlankLines(BlankLines {{ span: {}, count: {} }})",
+                    span_to_test(span),
+                    count
+                ),
                 t => format!("{:#?}", t),
             }
         );
