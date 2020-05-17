@@ -2,7 +2,7 @@ use nom::{
     combinator::map, error::ParseError, multi::separated_nonempty_list, IResult, InputLength, Slice,
 };
 
-use crate::Span;
+use crate::lex::Span;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Input {

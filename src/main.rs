@@ -4,8 +4,8 @@ use std::io::{self, Read};
 
 use nom::{error::VerboseError, IResult};
 
-use textecca::tokenize::{tokenize, BlankLines, Token};
-use textecca::Span;
+use textecca::lex::tokenize::{tokenize, BlankLines, Token};
+use textecca::lex::Span;
 
 fn span_to_test(s: Span) -> String {
     format!("input.offset({}, {:#?})", s.location_offset(), s.fragment())

@@ -17,11 +17,11 @@ use nom::{
 use nom_locate::position;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::parse_util::{
+use crate::lex::parse_util::{
     drop_parser, eof, is_inline_space, is_number, is_punctuation, is_symbol, next_egc_bound,
     peek_printing_char, take_inline_space1, take_number1, take_punctuation1, take_symbol1,
 };
-use crate::Span;
+use crate::lex::Span;
 
 /// A group of one or more blank lines.
 /// The lines may include whitespace.

@@ -12,7 +12,7 @@ use nom::{
 use nom_locate::{position, LocatedSpan};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::ucd_general_category;
+use crate::lex::ucd_general_category;
 
 pub type Span<'input, Extra = ()> = LocatedSpan<&'input str, Extra>;
 pub type Error<'input, Extra = ()> = VerboseError<Span<'input, Extra>>;
