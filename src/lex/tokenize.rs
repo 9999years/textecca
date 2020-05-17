@@ -340,7 +340,7 @@ mod test {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::test_util::Input;
+    use crate::lex::test_util::Input;
 
     macro_rules! assert_toks {
         ($input_name:ident, $toks:expr, $input:expr $(,)?) => {
@@ -381,6 +381,21 @@ mod test {
 
     #[test]
     fn blanklines() {
+        assert_toks!(
+            input,
+            vec![
+                Token::Word(input.offset(0, "foo")),
+                Token::Newline(input.offset(3, "\n")),
+                Token::BlankLines(BlankLines {
+                    span: input.offset(4, "\n"),
+                    count: 1
+                }),
+                Token::Word(input.offset(5, "bar")),
+                Token::Newline(input.offset(8, "")),
+            ],
+            "foo\n\nbar",
+        );
+
         assert_toks!(
             input,
             vec![
