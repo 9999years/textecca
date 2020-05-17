@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take as take_bytes},
@@ -125,8 +126,9 @@ impl<'i> Tokenizer<'i> {
             Word,
         }
 
-        impl From<char> for TokenType {
-            fn from(c: char) -> Self {
+        impl From<Span<'_>> for TokenType {
+            fn from(span: Span) -> Self {
+                let c = span.fragment().chars().next().unwrap();
                 if is_punctuation(c) || is_symbol(c) {
                     TokenType::Punct
                 } else if is_number(c) {
@@ -150,37 +152,15 @@ impl<'i> Tokenizer<'i> {
         };
 
         let mut starting_offset = 0;
-        let mut chunk_len = 0;
-        let mut current: Option<TokenType> = None;
 
         let mut it = iterator(
             i,
             preceded(not(Self::parse_immediate_newline), next_egc_bound),
         );
-        for egc in &mut it {
-            let c = egc.fragment().chars().next().unwrap();
-            let egc_type = c.into();
-
-            let chunk_type = match current {
-                None => {
-                    current = Some(egc_type);
-                    egc_type
-                }
-                Some(ty) => ty,
-            };
-
-            if chunk_type != egc_type {
-                push_current_tok(chunk_type, starting_offset, chunk_len);
-                starting_offset += chunk_len;
-                chunk_len = 0;
-                current = Some(egc_type);
-            }
-
-            chunk_len += egc.fragment().len();
-        }
-
-        if let Some(chunk_type) = current {
+        for (chunk_type, chunk) in &it.group_by(|egc| TokenType::from(*egc)) {
+            let chunk_len = chunk.map(|egc| egc.fragment().len()).sum();
             push_current_tok(chunk_type, starting_offset, chunk_len);
+            starting_offset += chunk_len;
         }
 
         it.finish()
