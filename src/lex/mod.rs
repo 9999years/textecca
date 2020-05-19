@@ -1,4 +1,5 @@
 mod blocks;
+mod cmd;
 pub mod tokenize;
 
 #[allow(dead_code)]

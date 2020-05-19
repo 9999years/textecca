@@ -80,6 +80,11 @@ pub fn take_inline_space1<'i, E: ParseError<Span<'i>>>(i: Span<'i>) -> IResult<S
     take_while1(is_inline_space)(i)
 }
 
+/// Takes a string of at least 1 consecutive non-`Zs` category codepoints.
+pub fn take_not_inline_space1<'i, E: ParseError<Span<'i>>>(i: Span<'i>) -> IResult<Span, Span, E> {
+    take_while1(|c| !is_inline_space(c))(i)
+}
+
 /// Succeeds if the next character is not whitespace.
 pub fn peek_printing_char<'i, E: ParseError<Span<'i>>>(i: Span<'i>) -> IResult<Span, (), E> {
     not(verify(anychar, |c| is_inline_space(*c)))(i)
