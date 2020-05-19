@@ -1,1 +1,0 @@
-/nix/store/rbj2gaqp86ljwf1ravqj2ywpw3i238d5-ucd_general_category.rs
