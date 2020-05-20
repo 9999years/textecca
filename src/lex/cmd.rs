@@ -6,7 +6,7 @@ use nom::{
     combinator::{all_consuming, complete, cut, map, not, opt, recognize, rest_len, value, verify},
     error::{context, make_error, ErrorKind, ParseError, VerboseError},
     multi::{many0, many1, many1_count, separated_nonempty_list},
-    sequence::{pair, preceded, terminated, tuple},
+    sequence::{delimited, pair, preceded, terminated, tuple},
     IResult, Slice,
 };
 
@@ -50,10 +50,16 @@ fn balanced_braces<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Sp
 
 /// Recognize a group of braces.
 fn brace_group<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span, E> {
-    map(
-        pair(take_char('{'), cut(pair(balanced_braces, take_char('}')))),
-        |(_, (inner, _))| inner,
-    )(i)
+    delimited(take_char('{'), balanced_braces, cut(take_char('}')))(i)
+}
+
+/// Parse a command keyword-argument name.
+fn command_kwarg_name<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span, E> {
+    recognize(many0(none_of("\\{}$=")))(i)
+}
+
+fn command_kwarg_value<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Option<Span>, E> {
+    opt(preceded(take_char('='), balanced_braces))(i)
 }
 
 /// Parse a command argument.
@@ -61,17 +67,14 @@ fn command_arg<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Argume
     preceded(
         opt(take_inline_space1),
         map(
-            pair(
+            delimited(
                 take_char('{'),
-                cut(tuple((
-                    recognize(many0(none_of("\\{}$="))),
-                    opt(pair(take_char('='), balanced_braces)),
-                    take_char('}'),
-                ))),
+                pair(command_kwarg_name, command_kwarg_value),
+                cut(take_char('}')),
             ),
-            |(_, (name, val, _))| Argument {
+            |(name, val)| Argument {
                 name: val.map(|_| name),
-                value: val.map(|(_sep, arg)| arg).unwrap_or(name),
+                value: val.unwrap_or(name),
             },
         ),
     )(i)
@@ -91,7 +94,7 @@ fn command<'a, E: ParseError<Span<'a>>>(
         map(
             pair(
                 command_name,
-                cut(many_at_least(mandatory_args, command_arg)),
+                cut(many_at_least(mandatory_args, complete(command_arg))),
             ),
             |(name, args)| Command { name, args },
         ),
@@ -104,6 +107,7 @@ mod test {
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use claim::*;
 
     use super::*;
 
@@ -182,14 +186,13 @@ mod test {
                 assert_eq!(input.eof(), rest);
             }
         };
+
+        let (input, res) = test_parse!(command_arg, "");
+        assert_err!(res);
     }
 
     #[test]
     fn test_command() {
-        let input = Input::new("\\x {y}");
-        let res: IResult<_, _, VerboseError<_>> = complete(command(0))(input.as_span());
-        dbg!(res.unwrap_err());
-
         let (input, res) = test_parse!(command(0), "\\x {y}");
         assert_parsed_all!(input, res);
         assert_destructure! {
