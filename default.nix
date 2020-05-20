@@ -71,8 +71,23 @@ let
       dontFixup = true;
     };
 
+  textecca = rustPlatform.buildRustPackage rec {
+    pname = "textecca";
+    version = "0.0.1-alpha";
+
+    src = ./.;
+
+    cargoSha256 = "0000000000000000000000000000000000000000000000000000";
+
+    meta = with lib; {
+      description = "";
+      license = with licenses; [ agpl3 ];
+      maintainers = with maintainers; [ ];
+    };
+  };
+
 in {
-  inherit ucd ucd-generate;
+  inherit ucd ucd-generate textecca;
   ucd-tables = ucd-tables {
     general-category = [ "N" "P" "Po" "S" "Zs" "L" "M" ];
     property-bool = [ "XID_Start" "XID_Continue" ];
