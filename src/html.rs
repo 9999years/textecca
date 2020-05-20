@@ -7,6 +7,7 @@ use html5ever::{
     serialize::{HtmlSerializer, SerializeOpts, Serializer, TraversalScope},
 };
 
+#[allow(unused_macros)] // TODO: We'll get back to this!
 macro_rules! html_name {
     ($el_name:tt) => {
         QualName::new(None, ns!(html), local_name!($el_name))

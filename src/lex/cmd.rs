@@ -187,12 +187,13 @@ mod test {
             }
         };
 
-        let (input, res) = test_parse!(command_arg, "");
+        let (_input, res) = test_parse!(command_arg, "");
         assert_err!(res);
     }
 
     #[test]
     fn test_command() {
+        // "At least 0 args" will absorb the 1 arg.
         let (input, res) = test_parse!(command(0), "\\x {y}");
         assert_parsed_all!(input, res);
         assert_destructure! {
@@ -208,7 +209,8 @@ mod test {
             }
         }
 
-        let (input, res) = test_parse!(command(0), "\\section{Whatever}");
+        // Here we have 1 arg.
+        let (input, res) = test_parse!(command(1), "\\section{Whatever}");
         assert_parsed_all!(input, res);
         assert_destructure! {
             let Ok((_, cmd)) = res;
@@ -222,5 +224,9 @@ mod test {
                 );
             }
         }
+
+        // We don't have 3 arguments
+        let (_input, res) = test_parse!(command(3), "\\section{Whatever}");
+        assert_err!(res);
     }
 }
