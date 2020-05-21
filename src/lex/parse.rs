@@ -10,7 +10,7 @@ use nom::{
     IResult, Slice,
 };
 
-use crate::lex::cmd::Command;
+use crate::lex::cmd::{command, Command};
 use crate::lex::Span;
 
 enum Token<'i> {
@@ -19,6 +19,15 @@ enum Token<'i> {
 }
 
 ///
-fn parse<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span, E> {
-    unimplemented!()
+fn parse<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Token, E> {
+    alt((
+        map(
+            recognize(many0(alt((
+                none_of("\\{}"),
+                preceded(take_char('\\'), one_of("{}")),
+            )))),
+            Token::Text,
+        ),
+        map(command(0), Token::Command),
+    ))(i)
 }

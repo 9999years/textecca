@@ -49,7 +49,7 @@ fn balanced_braces<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Sp
 }
 
 /// Recognize a group of braces.
-fn brace_group<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span, E> {
+pub fn brace_group<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span, E> {
     delimited(take_char('{'), balanced_braces, cut(take_char('}')))(i)
 }
 
