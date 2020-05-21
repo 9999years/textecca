@@ -1,4 +1,4 @@
-mod doc;
+pub mod doc;
 mod kinds;
 mod length;
-mod ser;
+pub mod ser;

@@ -36,6 +36,7 @@ ucd-trie = "0.1.3"
 itertools = "0.9.0"
 handlebars = "3.0.1"
 typed-builder = "0.6.0"
+thiserror = "1.0.18"
 # structopt = "0.3.14"
 # ammonia = "3" # HTML sanitization.
 # textwrap = "0.11" # word wrapping, indenting, deindenting

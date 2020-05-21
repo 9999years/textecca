@@ -1,19 +1,33 @@
 #[macro_use]
 use super::arg_spec::ArgSpec;
-use super::cmd::Command;
+use super::call_args::CallArgs;
+use super::cmd::{Call, CallError, Command};
+use crate::output::doc::{Block, Blocks, Heading, Inline};
+
+macro_rules! impl_cmd {
+    ($ty:ident, name = $name:expr, args = $($args:tt)*) => {
+        impl Command for $ty {
+            fn name() -> String {
+                ($name).into()
+            }
+
+            fn arg_spec() -> ArgSpec {
+                ArgSpec::new(vec![$($args)*])
+            }
+        }
+    };
+}
 
 pub struct Section;
 
-impl Command for Section {
-    fn name(&self) -> String {
-        "sec".to_string()
-    }
-
-    fn arg_spec(&self) -> ArgSpec {
-        ArgSpec::new(vec![
-            arg!(var "args"),
-            arg!(kw "kwargs"),
-            arg!(opt pos "optional positional"),
-        ])
+impl_cmd!(Section, name = "sec", args = arg!("name"));
+impl Call for Section {
+    fn call(args: &mut CallArgs) -> Result<Blocks, CallError> {
+        let name = args.args.remove("name").unwrap();
+        Ok(vec![Block::Heading(Heading {
+            level: 1,
+            text: vec![Inline::Text(name).into()],
+        })
+        .into()])
     }
 }

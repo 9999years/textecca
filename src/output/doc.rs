@@ -14,19 +14,31 @@ pub type Blocks = Vec<DocBlock>;
 #[derive(Debug, Clone, PartialEq)]
 pub struct DocBlock {
     block: Block,
-    meta: (),
+    meta: BlockMeta,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl From<Block> for DocBlock {
+    fn from(block: Block) -> Self {
+        Self {
+            block,
+            meta: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct BlockMeta {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
+    /// Text not in a paragraph.
+    Plain(Inlines),
+
     /// Paragraph.
-    Para(String),
+    Para(Inlines),
 
     /// Code block.
-    Code(String),
+    Code(Inlines),
 
     /// Block quote.
     Quote(Blocks),
@@ -76,8 +88,8 @@ pub enum Alignment {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Heading {
-    level: i32,
-    text: Inlines,
+    pub level: i32,
+    pub text: Inlines,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -105,7 +117,16 @@ pub struct DocInline {
     meta: InlineMeta,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl From<Inline> for DocInline {
+    fn from(inline: Inline) -> Self {
+        Self {
+            inline,
+            meta: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct InlineMeta {}
 
 pub type Inlines = Vec<DocInline>;
