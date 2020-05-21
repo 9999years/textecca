@@ -40,21 +40,12 @@ pub struct BlankLines<'i> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'i> {
-    /// A new level of indentation. The span gives the new additional indentation
-    /// prefix, which is added to the previous indentation.
+    /// Indentation (i.e. whitespace) at the beginning of a line. The span gives
+    /// the line's entire indentation.
     Indent(Span<'i>),
 
-    /// A decrement of some number of indented blocks.
-    Deindent(usize),
-
-    /// A word. This is nebulously defined and will be refined over time.
-    ///
-    /// By default, word boundaries are computed according to [UAX 29][tr29-wb].
-    /// However, some grammars may wish to split words into smaller tokens (for
-    /// example, while `don't` would be one word in running text, but `f'g` may
-    /// be several tokens in an equation context).
-    ///
-    /// [tr29-wb]: https://unicode.org/reports/tr29/#Default_Word_Boundaries
+    /// A word. A span containing graphemes that each begin with category `L`
+    /// codepoints.
     Word(Span<'i>),
 
     /// Inline space, e.g. between words or at the end of a line.
@@ -70,9 +61,10 @@ pub enum Token<'i> {
 
     /// A group of number codepoints ([category `N`][tr44-categories]).
     ///
-    /// Note that in many cases, a "number" may contain one or more `Num` tokens
-    /// surrounded by `Punct` or `Word` tokens (possible edge cases include
-    /// strings like `1 million`, `0x33`, `1,000`, `3.22`).
+    /// Note that in many cases, a semantic number as written out in source code
+    /// may contain one or more `Num` tokens, but may also contain `Punct` or
+    /// `Word` tokens (possible edge cases include strings like `1 million`,
+    /// `0x33`, `1,000`, `3.22`).
     ///
     /// [tr44-categories]: https://unicode.org/reports/tr44/#General_Category_Values
     Num(Span<'i>),
@@ -166,81 +158,23 @@ impl<'i> Tokenizer<'i> {
         it.finish()
     }
 
-    /// Recognizes indentation at the start of a line.
-    ///
-    /// Returns any of `Token::Indent`, `Token::Deindent`, or `Token::Newline`
-    ///
-    /// `None` indicates no change in indentation.
-    fn parse_indent<E: ParseError<Span<'i>>>(
-        &mut self,
-        i: Span<'i>,
-    ) -> IResult<Span<'i>, Option<Token<'i>>, E> {
-        let mut rest = i;
-        for (i, chunk) in self.indent.iter().enumerate() {
-            let (next_rest, deindent) = alt((
-                // The next chunk of indentation.
-                value(None, tag(*chunk)),
-                // The next character is *not* whitespace -- deindent.
-                map(peek_printing_char, |()| {
-                    Some(Token::Deindent(self.indent.len() - i))
-                }),
-                // The next character *is* whitespace; if we have a newline,
-                // that's valid. Otherwise, we have an indentation error.
-                context(
-                    "blank line or indentation matches no outer block",
-                    cut(map(Self::parse_newline, Some)),
-                ),
-            ))(rest)?;
-
-            if deindent.is_some() {
-                return Ok((next_rest, deindent));
-            }
-
-            rest = next_rest;
-        }
-
-        alt((
-            // The next character is *not* whitespace -- no change in indentation.
-            value(None, peek_printing_char),
-            // The next character *is* whitespace; if we have a newline,
-            // that's a blank line. Otherwise, we have a nested block.
-            context(
-                "nested block",
-                map(
-                    pair(take_inline_space1, opt(Self::parse_immediate_newline)),
-                    |(indent, maybe_newline)| {
-                        Some(maybe_newline.map_or_else(|| Token::Indent(indent), Token::Newline))
-                    },
-                ),
-            ),
-        ))(rest)
-    }
-
     fn parse_line<E: ParseError<Span<'i>> + Clone>(
         &mut self,
         i: Span<'i>,
     ) -> IResult<Span<'i>, (), E> {
-        let (rest, maybe_tok) = self.parse_indent(i)?;
+        let rest = i;
 
-        if let Some(Token::Newline(span)) = maybe_tok {
+        let (rest, (indent, nl)) =
+            pair(opt(take_inline_space1), opt(Self::parse_immediate_newline))(rest)?;
+
+        if let Some(span) = nl {
             self.toks
                 .push(Token::BlankLines(BlankLines { span, count: 1 }));
             return Ok((rest, ()));
         }
 
-        if let Some(tok) = maybe_tok {
-            match tok {
-                Token::Indent(span) => {
-                    self.indent.push(span.fragment());
-                }
-                Token::Deindent(count) => {
-                    self.indent.truncate(self.indent.len() - count);
-                }
-                _ => {
-                    unreachable!();
-                }
-            }
-            self.toks.push(tok);
+        if let Some(span) = indent {
+            self.toks.push(Token::Indent(span));
         }
 
         let (rest, ()) = self.parse_after_indent(rest)?;
@@ -424,7 +358,6 @@ mod test {
                 Token::Indent(input.offset(10, "    ")),
                 Token::Word(input.offset(14, "indent")),
                 Token::Newline(input.offset(20, "\n")),
-                Token::Deindent(1),
                 Token::Word(input.offset(21, "deindent")),
                 Token::Punct(input.offset(29, "_")),
                 Token::Num(input.offset(30, "1")),
@@ -444,14 +377,14 @@ mod test {
             )
         );
 
-        // Indentation error!
-        assert_toks_err!(indoc!(
-            r#"
-                no_indent
-                    extra_indent
-                  error
-                "#
-        ));
+        // // Indentation error!
+        // assert_toks_err!(indoc!(
+        //     r#"
+        //         no_indent
+        //             extra_indent
+        //           error
+        //         "#
+        // ));
 
         assert_toks!(
             input,
@@ -465,26 +398,26 @@ mod test {
                 Token::Punct(input.offset(19, "_",)),
                 Token::Word(input.offset(20, "indent",)),
                 Token::Newline(input.offset(26, "\n",)),
-                Token::Indent(input.offset(31, "    ",)),
+                Token::Indent(input.offset(27, "        ",)),
                 Token::Word(input.offset(35, "extra",)),
                 Token::Punct(input.offset(40, "_",)),
                 Token::Word(input.offset(41, "indent",)),
                 Token::Newline(input.offset(47, "\n",)),
-                Token::Deindent(1),
+                Token::Indent(input.offset(48, "    ",)),
                 Token::Word(input.offset(52, "deindent",)),
                 Token::Punct(input.offset(60, "_",)),
                 Token::Num(input.offset(61, "1",)),
                 Token::Newline(input.offset(62, "\n",)),
+                Token::Indent(input.offset(63, "    ",)),
                 Token::Word(input.offset(67, "same",)),
                 Token::Punct(input.offset(71, "_",)),
                 Token::Word(input.offset(72, "indent",)),
                 Token::Newline(input.offset(78, "\n",)),
-                Token::Indent(input.offset(83, "        ",)),
+                Token::Indent(input.offset(79, "            ",)),
                 Token::Word(input.offset(91, "extra",)),
                 Token::Punct(input.offset(96, "_",)),
                 Token::Word(input.offset(97, "indent",)),
                 Token::Newline(input.offset(103, "\n",)),
-                Token::Deindent(2),
                 Token::Word(input.offset(104, "deindent",)),
                 Token::Space(input.offset(112, " ",)),
                 Token::Num(input.offset(113, "2",)),

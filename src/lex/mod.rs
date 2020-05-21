@@ -1,5 +1,6 @@
 mod blocks;
 mod cmd;
+mod parse;
 pub mod tokenize;
 
 mod ucd_tables;

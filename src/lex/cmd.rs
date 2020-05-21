@@ -18,23 +18,23 @@ use crate::lex::parse_util::{
 use crate::lex::Span;
 
 #[derive(Clone, Debug, PartialEq)]
-struct Command<'i> {
+pub struct Command<'i> {
     name: Span<'i>,
     args: Vec<Argument<'i>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct Argument<'i> {
+pub struct Argument<'i> {
     name: Option<Span<'i>>,
     value: Span<'i>,
 }
 
 impl<'i> Argument<'i> {
-    fn new(name: Option<Span<'i>>, value: Span<'i>) -> Self {
+    pub fn new(name: Option<Span<'i>>, value: Span<'i>) -> Self {
         Argument { name, value }
     }
 
-    fn from_value(value: Span<'i>) -> Self {
+    pub fn from_value(value: Span<'i>) -> Self {
         Argument { name: None, value }
     }
 }
@@ -86,7 +86,7 @@ fn command_name<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span,
 }
 
 /// Parse a command and at least `mandatory_args` args.
-fn command<'a, E: ParseError<Span<'a>>>(
+pub fn command<'a, E: ParseError<Span<'a>>>(
     mandatory_args: usize,
 ) -> impl Fn(Span<'a>) -> IResult<Span, Command, E> {
     context(
@@ -105,9 +105,9 @@ fn command<'a, E: ParseError<Span<'a>>>(
 mod test {
     use nom::error::{make_error, ErrorKind, VerboseError, VerboseErrorKind};
 
+    use claim::*;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
-    use claim::*;
 
     use super::*;
 
