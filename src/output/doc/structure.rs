@@ -1,4 +1,5 @@
-use super::length::Length;
+use super::blocks::*;
+use super::inlines::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Doc {
@@ -63,55 +64,6 @@ pub enum Block {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Table {
-    columns: Vec<TableColumn>,
-    cells: Vec<Vec<TableCell>>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TableCell {
-    alignment: Option<Alignment>,
-    row_span: i64,
-    col_span: i64,
-    content: Blocks,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TableColumn {
-    alignment: Alignment,
-    /// Relative width.
-    width: f64,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Alignment {}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Heading {
-    pub level: i32,
-    pub text: Inlines,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct List {
-    kind: ListKind,
-    items: Vec<ListItem>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ListKind {
-    Unordered,
-    Ordered,
-    Definition,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ListItem {
-    label: Option<Inlines>,
-    content: Blocks,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub struct DocInline {
     inline: Inline,
     meta: InlineMeta,
@@ -163,49 +115,3 @@ pub enum Inline {
     /// Mathematics.
     Math(String),
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Link {
-    text: Inlines,
-    label: Option<String>,
-    target: String,
-}
-
-/// Maybe at some point in the future.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Citation {}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Quote {
-    kind: QuoteKind,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum QuoteKind {
-    Single,
-    Double,
-    /// Left, right quote markers.
-    Other(Box<DocInline>, Box<DocInline>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Style {
-    Emph,
-    Strong,
-    Superscript,
-    Subscript,
-    SmallCaps,
-    Strikeout,
-    Underline,
-    Size(Length),
-    Color(Color),
-    Font(Font),
-    FontFeatures(FontFeatures),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Color {}
-#[derive(Debug, Clone, PartialEq)]
-pub struct Font {}
-#[derive(Debug, Clone, PartialEq)]
-pub struct FontFeatures {}
