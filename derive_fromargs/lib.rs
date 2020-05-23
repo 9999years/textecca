@@ -86,9 +86,11 @@ fn textecca_name(attrs: &[syn::Attribute], default: &syn::Ident) -> String {
         .unwrap_or_else(|| default.to_string().to_snake_case())
 }
 
+#[derive(Clone)]
 enum ParamRequired {
     Mandatory,
-    Optional,
+    /// Optional with default value
+    Optional(Option<String>),
 }
 
 #[derive(Clone, Copy)]
@@ -98,6 +100,7 @@ enum KeywordRequired {
     Mandatory,
 }
 
+#[derive(Clone, Copy)]
 enum ParamKind {
     Normal,
     VarArgs,
@@ -120,7 +123,7 @@ impl Param {
             path: match &self.kind {
                 ParamKind::Normal => match &self.required {
                     ParamRequired::Mandatory => syn::parse_str("::std::string::String").unwrap(),
-                    ParamRequired::Optional => {
+                    ParamRequired::Optional(_) => {
                         syn::parse_str("::std::option::Option<::std::string::String>").unwrap()
                     }
                 },
@@ -133,6 +136,16 @@ impl Param {
                 .unwrap(),
             },
         })
+    }
+
+    fn name(&self) -> String {
+        self.name.clone().unwrap_or_else(|| self.ident.to_string())
+    }
+
+    fn from_args(&self) -> proc_macro2::TokenStream {
+        // TODO: figure out how to turn Vec<Param> into code to fetch the params.
+        let name_str = syn::Lit::Str(syn::LitStr::new(&self.name(), Span::call_site()));
+        quote! {}
     }
 }
 
@@ -200,7 +213,7 @@ fn is_hashmap_string_string(ty: &syn::Type) -> bool {
     })
 }
 
-fn struct_to_params(cmd_name: &str, data: syn::Data) -> Vec<Param> {
+fn struct_to_params(data: syn::Data) -> Vec<Param> {
     match data {
         syn::Data::Struct(syn::DataStruct {
             fields: syn::Fields::Named(syn::FieldsNamed { named, .. }),
@@ -212,27 +225,86 @@ fn struct_to_params(cmd_name: &str, data: syn::Data) -> Vec<Param> {
             let following_are_kw = syn_path!("begin_kw_only");
             let name_path = syn_path!("name");
             let default_path = syn_path!("default");
+
+            let mut seen_prev_are_pos = false;
+            let mut seen_following_are_kw = false;
+            // let mut seen_kwargs = false;
+            // let mut seen_varargs = false;
             let mut kw_required = KeywordRequired::Allowed;
-            let mut ret = Vec::with_capacity(named.len());
+            let mut required = ParamRequired::Mandatory;
+            let mut ret = Vec::<Param>::with_capacity(named.len());
             for field in named {
+                let mut name = None;
+                let mut kind = ParamKind::Normal;
                 for meta in get_attrs(&field.attrs, prev_are_pos.clone()) {
                     if let syn::Meta::Path(path) = meta {
                         if path == prev_are_pos {
-                            unimplemented!();
+                            if seen_prev_are_pos {
+                                panic!(
+                                    "Only one #[{:?}] attribute is allowed per command.",
+                                    prev_are_pos
+                                );
+                            }
+                            seen_prev_are_pos = true;
+                            let iter = ret.iter_mut();
+                            for param in iter {
+                                param.keyword = KeywordRequired::Never;
+                            }
                         } else if path == following_are_kw {
-                            let _opt = Some(1); // remove, to prevent a warning
-                            unimplemented!();
+                            if seen_following_are_kw {
+                                panic!(
+                                    "Only one #[{:?}] attribute is allowed per command.",
+                                    following_are_kw
+                                );
+                            }
+                            seen_following_are_kw = true;
+                            kw_required = KeywordRequired::Mandatory;
                         }
                     } else if let syn::Meta::NameValue(meta) = meta {
                         if meta.path == name_path {
-                            unimplemented!();
+                            name = match meta.lit {
+                                syn::Lit::Str(lit) => Some(lit.value()),
+                                _ => panic!(
+                                    "Parameter name for {} is not a string.",
+                                    field.ident.unwrap(),
+                                ),
+                            };
                         } else if meta.path == default_path {
-                            unimplemented!();
+                            required = ParamRequired::Optional(match meta.lit {
+                                syn::Lit::Str(lit) => Some(lit.value()),
+                                _ => panic!(
+                                    "Default parameter value for {} is not a string.",
+                                    field.ident.unwrap(),
+                                ),
+                            });
                         }
                     }
                 }
 
-                // TODO: construct Param, push to ret
+                let required = match &required {
+                    ParamRequired::Mandatory => {
+                        if is_option_string(&field.ty) {
+                            ParamRequired::Optional(None)
+                        } else {
+                            ParamRequired::Mandatory
+                        }
+                    }
+                    _ => required.clone(),
+                };
+
+                if is_vec_string(&field.ty) {
+                    kind = ParamKind::VarArgs;
+                } else if is_hashmap_string_string(&field.ty) {
+                    kind = ParamKind::KwArgs;
+                }
+
+                ret.push(Param {
+                    ident: field.ident.unwrap(),
+                    name,
+                    required: required.clone(),
+                    keyword: kw_required,
+                    kind,
+                })
             }
             ret
         }
