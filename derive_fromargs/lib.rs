@@ -86,7 +86,121 @@ fn textecca_name(attrs: &[syn::Attribute], default: &syn::Ident) -> String {
         .unwrap_or_else(|| default.to_string().to_snake_case())
 }
 
-fn try_from_impl(cmd_name: &str, data: syn::Data) {
+enum ParamRequired {
+    Mandatory,
+    Optional,
+}
+
+#[derive(Clone, Copy)]
+enum KeywordRequired {
+    Never,
+    Allowed,
+    Mandatory,
+}
+
+enum ParamKind {
+    Normal,
+    VarArgs,
+    KwArgs,
+}
+
+struct Param {
+    ident: syn::Ident,
+    /// Parameter name, if different from the identifier name.
+    name: Option<String>,
+    required: ParamRequired,
+    keyword: KeywordRequired,
+    kind: ParamKind,
+}
+
+impl Param {
+    fn get_type(&self) -> syn::Type {
+        syn::Type::Path(syn::TypePath {
+            qself: None,
+            path: match &self.kind {
+                ParamKind::Normal => match &self.required {
+                    ParamRequired::Mandatory => syn::parse_str("::std::string::String").unwrap(),
+                    ParamRequired::Optional => {
+                        syn::parse_str("::std::option::Option<::std::string::String>").unwrap()
+                    }
+                },
+                ParamKind::VarArgs => {
+                    syn::parse_str("::std::vec::Vec<::std::string::String>").unwrap()
+                }
+                ParamKind::KwArgs => syn::parse_str(
+                    "::std::collections::HashMap<::std::string::String, ::std::string::String>",
+                )
+                .unwrap(),
+            },
+        })
+    }
+}
+
+fn type_matches(
+    ty: &syn::Type,
+    last_segment: &str,
+    generic_args_match: impl Fn(
+        &syn::punctuated::Punctuated<syn::GenericArgument, syn::token::Comma>,
+    ) -> bool,
+) -> bool {
+    match ty {
+        syn::Type::Path(syn::TypePath {
+            qself: None,
+            path: syn::Path { segments, .. },
+        }) => {
+            let syn::PathSegment { ident, arguments } =
+                segments.last().expect("Type should be non-empty.");
+            ident == last_segment
+                && match arguments {
+                    syn::PathArguments::AngleBracketed(bracketed) => {
+                        generic_args_match(&bracketed.args)
+                    }
+                    _ => false,
+                }
+        }
+        _ => false,
+    }
+}
+
+fn is_string(ty: &syn::Type) -> bool {
+    type_matches(ty, "String", |_| false)
+}
+
+fn is_option_string(ty: &syn::Type) -> bool {
+    type_matches(ty, "Option", |args| {
+        args.len() == 1
+            && match args.first().unwrap() {
+                syn::GenericArgument::Type(ty) => is_string(ty),
+                _ => false,
+            }
+    })
+}
+
+fn is_vec_string(ty: &syn::Type) -> bool {
+    type_matches(ty, "Vec", |args| {
+        args.len() == 1
+            && match args.first().unwrap() {
+                syn::GenericArgument::Type(ty) => is_string(ty),
+                _ => false,
+            }
+    })
+}
+
+fn is_hashmap_string_string(ty: &syn::Type) -> bool {
+    type_matches(ty, "HashMap", |args| {
+        args.len() == 1
+            && match args.first().unwrap() {
+                syn::GenericArgument::Type(ty) => is_string(ty),
+                _ => false,
+            }
+            && match &args[1] {
+                syn::GenericArgument::Type(ty) => is_string(&ty),
+                _ => false,
+            }
+    })
+}
+
+fn struct_to_params(cmd_name: &str, data: syn::Data) -> Vec<Param> {
     match data {
         syn::Data::Struct(syn::DataStruct {
             fields: syn::Fields::Named(syn::FieldsNamed { named, .. }),
@@ -94,9 +208,33 @@ fn try_from_impl(cmd_name: &str, data: syn::Data) {
         }) => {
             // TODO: Which attribute names indicate "previous parameters are
             // positional-only" and "following parameters are keyword-only"?
-            // #[end_pos_only]
-            // #[begin_kw_only]
-            unimplemented!()
+            let prev_are_pos = syn_path!("end_pos_only");
+            let following_are_kw = syn_path!("begin_kw_only");
+            let name_path = syn_path!("name");
+            let default_path = syn_path!("default");
+            let mut kw_required = KeywordRequired::Allowed;
+            let mut ret = Vec::with_capacity(named.len());
+            for field in named {
+                for meta in get_attrs(&field.attrs, prev_are_pos.clone()) {
+                    if let syn::Meta::Path(path) = meta {
+                        if path == prev_are_pos {
+                            unimplemented!();
+                        } else if path == following_are_kw {
+                            let _opt = Some(1); // remove, to prevent a warning
+                            unimplemented!();
+                        }
+                    } else if let syn::Meta::NameValue(meta) = meta {
+                        if meta.path == name_path {
+                            unimplemented!();
+                        } else if meta.path == default_path {
+                            unimplemented!();
+                        }
+                    }
+                }
+
+                // TODO: construct Param, push to ret
+            }
+            ret
         }
         _ => panic!("Can only derive textecca::Command on structs with named fields."),
     }
