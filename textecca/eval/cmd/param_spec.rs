@@ -1,38 +1,38 @@
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone, PartialEq)]
-pub enum ArgSpecError {
+pub enum ParamSpecError {
     #[error("More than one varargs declared")]
     MultipleVarArgs,
 
     #[error("More than one kwargs declared")]
     MultipleKwArgs,
 
-    #[error("Mandatory arg {0} after optional arg")]
+    #[error("Mandatory param {0} after optional param")]
     MandatoryAfterOptional(String),
 
-    /// A positional argument after a keyword-only argument, including a kwargs.
-    #[error("Positional arg {0} after keyword-only arg")]
+    /// A positional param after a keyword-only param (possibly a kwargs).
+    #[error("Positional param {0} after keyword-only param")]
     PositionalAfterKw(String),
 
-    /// A positional argument after varargs is given.
-    #[error("Positional arg {0} after varargs")]
+    /// A positional param after varargs.
+    #[error("Positional param {0} after varargs")]
     PositionalAfterVarArgs(String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ArgSpec(Vec<Arg>);
+pub struct ParamSpec(Vec<Param>);
 
-impl ArgSpec {
-    pub fn new(args: Vec<Arg>) -> Self {
-        ArgSpec(args)
+impl ParamSpec {
+    pub fn new(params: Vec<Param>) -> Self {
+        ParamSpec(params)
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Arg {
-    /// A normal named argument.
-    Normal(NormalArg),
+pub enum Param {
+    /// A normal named parameter.
+    Normal(NormalParam),
 
     /// A variable number of arguments, after all mandatory and optional
     /// positional arguments, referred to by the name in the `String`.
@@ -44,13 +44,13 @@ pub enum Arg {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct NormalArg {
+pub struct NormalParam {
     pub name: String,
     pub required: Required,
     pub keyword: Keyword,
 }
 
-impl NormalArg {
+impl NormalParam {
     pub fn new(name: String, required: Required, keyword: Keyword) -> Self {
         Self {
             name,
@@ -59,27 +59,27 @@ impl NormalArg {
         }
     }
 
-    /// Creates a new optional positional-only argument.
+    /// Creates a new optional positional-only parameter.
     pub fn new_optional_positional(name: String) -> Self {
         Self::new(name, Required::Optional, Keyword::Never)
     }
 
-    /// Creates a new optional argument.
+    /// Creates a new optional parameter.
     pub fn new_optional(name: String) -> Self {
         Self::new(name, Required::Optional, Keyword::Allowed)
     }
 
-    /// Creates a new optional keyword-only argument.
+    /// Creates a new optional keyword-only parameter.
     pub fn new_optional_keyword(name: String) -> Self {
         Self::new(name, Required::Optional, Keyword::Mandatory)
     }
 
-    /// Creates a new mandatory positional-only argument.
+    /// Creates a new mandatory positional-only parameter.
     pub fn new_positional_only(name: String) -> Self {
         Self::new(name, Required::Mandatory, Keyword::Never)
     }
 
-    /// Creates a new mandatory argument.
+    /// Creates a new mandatory parameter.
     pub fn new_positional(name: String) -> Self {
         Self::new(name, Required::Mandatory, Keyword::Allowed)
     }
@@ -87,8 +87,8 @@ impl NormalArg {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Required {
-    Optional,
     Mandatory,
+    Optional,
 }
 
 impl Default for Required {
@@ -111,12 +111,6 @@ impl Default for Keyword {
     fn default() -> Self {
         Keyword::Allowed
     }
-}
-
-enum ArgKind {
-    Normal,
-    VarArgs,
-    KwArgs,
 }
 
 macro_rules! arg {

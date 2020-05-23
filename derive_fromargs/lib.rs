@@ -92,8 +92,10 @@ fn try_from_impl(cmd_name: &str, data: syn::Data) {
             fields: syn::Fields::Named(syn::FieldsNamed { named, .. }),
             ..
         }) => {
-            // TODO: Which attribute names indicate "previous arguments are
-            // positional-only" and "following arguments are keyword-only"?
+            // TODO: Which attribute names indicate "previous parameters are
+            // positional-only" and "following parameters are keyword-only"?
+            // #[end_pos_only]
+            // #[begin_kw_only]
             unimplemented!()
         }
         _ => panic!("Can only derive textecca::Command on structs with named fields."),

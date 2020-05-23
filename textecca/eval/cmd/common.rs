@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use thiserror::Error;
 
-use super::arg_spec::ArgSpec;
+use super::param_spec::ParamSpec;
 use crate::output::doc::{Block, Blocks};
 
 #[derive(Clone, Debug, PartialEq, Error)]
