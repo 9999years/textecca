@@ -5,3 +5,5 @@
 mod eval;
 mod lex;
 mod output;
+
+pub use eval::*;
