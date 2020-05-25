@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
+use std::io::{self, Write};
 
 use thiserror::Error;
+
+use super::param_spec::ParamSpec;
+use crate::output::doc::{Block, Blocks};
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum FromArgsError {
@@ -18,13 +22,27 @@ pub enum FromArgsError {
     MissingKeyword(String),
 }
 
+#[derive(Clone, Debug, PartialEq, Error)]
+pub enum CommandError {
+    #[error("Type error: {0}")]
+    TypeError(String),
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParsedRawArgs {
     pub args: Vec<String>,
     pub kwargs: HashMap<String, String>,
 }
 
-pub trait Command: TryFrom<ParsedRawArgs, Error = FromArgsError> {
+pub type FromArgsFn = fn(ParsedRawArgs) -> Result<Box<dyn Command>, FromArgsError>;
+
+pub trait CommandInfo {
     /// The command's name.
-    fn name() -> String;
+    fn name(&self) -> String;
+
+    fn from_args_fn(&self) -> FromArgsFn;
+}
+
+pub trait Command {
+    fn call(&mut self) -> Result<Blocks, CommandError>;
 }

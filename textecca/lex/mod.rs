@@ -1,5 +1,6 @@
 mod blocks;
 mod cmd;
+pub use cmd::*;
 mod parse;
 pub mod tokenize;
 

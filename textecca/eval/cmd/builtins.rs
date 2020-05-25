@@ -1,7 +1,7 @@
 // #[macro_use]
 // use super::arg_spec::ArgSpec;
 // use super::call_args::CallArgs;
-// use super::cmd::{Call, CallError, Command};
+use super::{Command, CommandError, CommandInfo};
 // use crate::output::doc::{Block, Blocks, Heading, Inline};
 
 // macro_rules! impl_cmd {
