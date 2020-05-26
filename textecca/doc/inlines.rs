@@ -1,5 +1,12 @@
-use super::super::length::Length;
-use super::structure::Inlines;
+use super::Length;
+use super::{Inlines, Meta};
+
+/// A group of inlines taggee with some metadata.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaggedInlines {
+    content: Inlines,
+    meta: Meta,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Link {

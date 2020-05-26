@@ -2,8 +2,8 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-mod eval;
-mod lex;
-mod output;
-
-pub use eval::*;
+pub mod cmd;
+pub mod doc;
+pub mod env;
+pub mod parse;
+pub mod ser;

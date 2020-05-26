@@ -1,34 +1,23 @@
+use std::collections::HashMap;
+
 use super::blocks::*;
 use super::inlines::*;
 
+/// Some metadata to be associated with a group of blocks or inlines; metadata is
+/// currently unstructured and its representation will almost certainly change in
+/// the future.
+pub type Meta = HashMap<String, String>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Doc {
-    meta: Meta,
-    content: Blocks,
+    pub meta: DocMeta,
+    pub content: Blocks,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Meta {}
+pub struct DocMeta {}
 
-pub type Blocks = Vec<DocBlock>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct DocBlock {
-    block: Block,
-    meta: BlockMeta,
-}
-
-impl From<Block> for DocBlock {
-    fn from(block: Block) -> Self {
-        Self {
-            block,
-            meta: Default::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct BlockMeta {}
+pub type Blocks = Vec<Block>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
@@ -61,27 +50,11 @@ pub enum Block {
 
     /// A concept; this could be a warning, definition, note, theorem, etc.
     Concept(Blocks),
+
+    Tagged(Blocks),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct DocInline {
-    inline: Inline,
-    meta: InlineMeta,
-}
-
-impl From<Inline> for DocInline {
-    fn from(inline: Inline) -> Self {
-        Self {
-            inline,
-            meta: Default::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct InlineMeta {}
-
-pub type Inlines = Vec<DocInline>;
+pub type Inlines = Vec<Inline>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Inline {

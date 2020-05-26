@@ -1,9 +1,0 @@
-Blank lines may include whitespace.
-    
-    	
-	    
-
- 
-				
-These two paragraphs are separated by blank lines containing varying amounts
-of whitespace.

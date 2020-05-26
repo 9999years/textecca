@@ -1,4 +1,15 @@
-use super::structure::{Blocks, Inlines};
+use std::collections::HashMap;
+
+use super::structure::{Blocks, Inlines, Meta};
+
+/// A group of blocks tagged with some metadata; metadata is currently
+/// unstructured and its representation will almost certainly change in the
+/// future.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaggedBlocks {
+    content: Blocks,
+    meta: Meta,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Table {
@@ -22,7 +33,11 @@ pub struct TableColumn {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Alignment {}
+pub enum Alignment {
+    Left,
+    Right,
+    Center,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Heading {
