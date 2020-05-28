@@ -24,6 +24,16 @@ pub struct Command<'i> {
     args: Vec<Argument<'i>>,
 }
 
+impl<'i> Command<'i> {
+    pub fn from_name(name: Span<'i>) -> Self {
+        Self::new(name, Vec::new())
+    }
+
+    pub fn new(name: Span<'i>, args: Vec<Argument<'i>>) -> Self {
+        Self { name, args }
+    }
+}
+
 /// An argument to a command.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Argument<'i> {

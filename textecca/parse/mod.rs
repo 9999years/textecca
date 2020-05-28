@@ -1,7 +1,10 @@
 //! Parsing textecca source.
+use std::borrow::Cow;
+
 use nom::error::VerboseError;
 use nom_locate::LocatedSpan;
 
+mod arena;
 mod cmd;
 mod default_parser;
 mod lex;
@@ -12,6 +15,7 @@ mod ucd_tables;
 #[cfg(test)]
 mod test_util;
 
+pub use arena::*;
 pub use cmd::*;
 pub use default_parser::*;
 pub use lex::*;
@@ -45,9 +49,9 @@ pub enum RawToken<'i> {
 /// A line in the parser input.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Line<'i> {
-    indent: Span<'i>,
-    text: Span<'i>,
-    newline: Span<'i>,
+    pub indent: Span<'i>,
+    pub text: Span<'i>,
+    pub newline: Span<'i>,
 }
 
 /// A group of one or more blank lines.
@@ -65,6 +69,18 @@ pub struct BlankLines<'i> {
     pub count: u32,
 }
 
+impl<'i> From<Line<'i>> for RawToken<'i> {
+    fn from(line: Line<'i>) -> Self {
+        Self::Line(line)
+    }
+}
+
+impl<'i> From<BlankLines<'i>> for RawToken<'i> {
+    fn from(blanklines: BlankLines<'i>) -> Self {
+        Self::BlankLines(blanklines)
+    }
+}
+
 /// A parsed but unevaluated region of input.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'i> {
@@ -73,6 +89,18 @@ pub enum Token<'i> {
 
     /// A command, to be evaluated, and its arguments.
     Command(Command<'i>),
+}
+
+impl<'i> From<Span<'i>> for Token<'i> {
+    fn from(span: Span<'i>) -> Self {
+        Self::Text(span)
+    }
+}
+
+impl<'i> From<Command<'i>> for Token<'i> {
+    fn from(cmd: Command<'i>) -> Self {
+        Self::Command(cmd)
+    }
 }
 
 /// A function transforming a stream of `RawToken`s into a sequence of `Token`s;
