@@ -4,7 +4,6 @@ use std::convert::{TryFrom, TryInto};
 use proc_macro::{self, TokenStream};
 use proc_macro2::Span;
 use quote::quote;
-use syn;
 
 use inflector::Inflector;
 

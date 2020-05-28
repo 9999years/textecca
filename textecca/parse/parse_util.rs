@@ -9,13 +9,10 @@ use nom::{
     sequence::{pair, preceded, terminated, tuple},
     IResult, Slice,
 };
-use nom_locate::{position, LocatedSpan};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::lex::ucd_tables::{general_category, property_bool};
-
-pub type Span<'input, Extra = ()> = LocatedSpan<&'input str, Extra>;
-pub type Error<'input, Extra = ()> = VerboseError<Span<'input, Extra>>;
+use super::ucd_tables::{general_category, property_bool};
+use super::Span;
 
 /// Drops the result of a parser.
 pub fn drop_parser<I, O, E, F>(f: F) -> impl Fn(I) -> IResult<I, (), E>

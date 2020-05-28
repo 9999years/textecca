@@ -8,7 +8,7 @@ use nom::{
 use claim::*;
 use pretty_assertions::assert_eq;
 
-use crate::lex::Span;
+use super::Span;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Input {

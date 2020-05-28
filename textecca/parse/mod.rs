@@ -3,7 +3,18 @@ use nom::error::VerboseError;
 use nom_locate::LocatedSpan;
 
 mod cmd;
+mod default_parser;
+mod lex;
+mod parse_util;
+mod ucd_tables;
+
+#[macro_use]
+#[cfg(test)]
+mod test_util;
+
 pub use cmd::*;
+pub use default_parser::*;
+pub use lex::*;
 
 /// A region of input.
 ///
@@ -70,4 +81,4 @@ pub enum Token<'i> {
 ///
 /// This makes textecca's markup language highly flexible, so care must be taken
 /// to make parsers that aren't confusing and don't behave unexpectedly.
-pub type Parser = for<'i> fn(Vec<RawToken<'i>>) -> Vec<Token<'i>>;
+pub type Parser = for<'i> fn(RawTokens<'i>) -> Tokens<'i>;
