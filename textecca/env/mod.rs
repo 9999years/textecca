@@ -8,6 +8,7 @@ use derivative::Derivative;
 use crate::cmd::{Command, CommandInfo, FromArgs, FromArgsError, ParsedArgs};
 use crate::parse::Parser;
 
+/// A memoized `CommandInfo` in an `Environment`.
 #[derive(Derivative, Clone, Copy)]
 #[derivative(Debug)]
 struct EnvCommandInfo {
@@ -17,6 +18,8 @@ struct EnvCommandInfo {
     parser: Parser,
 }
 
+/// An evaluation environment, mapping command names to bindings and inheriting
+/// from a parent environment.
 #[derive(Default, Debug, Clone)]
 pub struct Environment {
     parent: Option<Rc<Environment>>,
@@ -24,6 +27,14 @@ pub struct Environment {
 }
 
 impl Environment {
+    /// Creates a new environment inheriting from this one.
+    pub fn new_inheriting(self: Rc<Self>) -> Self {
+        Self {
+            parent: Some(self),
+            ..Default::default()
+        }
+    }
+
     fn cmd_info(&self, name: &str) -> Option<&EnvCommandInfo> {
         self.cmds
             .get(name)
@@ -41,13 +52,5 @@ impl Environment {
     pub fn add_binding(&mut self, cmd_info: &dyn CommandInfo) {
         // self.cmds.insert(cmd_info.name(), cmd_info.from_args_fn());
         unimplemented!()
-    }
-
-    /// Creates a new environment inheriting from this one.
-    fn new_inheriting(self: Rc<Self>) -> Self {
-        Self {
-            parent: Some(self),
-            ..Default::default()
-        }
     }
 }

@@ -1,5 +1,6 @@
-/// A length, either relative or absolute. Generally compatible with [CSS
-/// lengths].
+/// A length, either relative or absolute.
+///
+/// Generally compatible with [CSS lengths].
 ///
 /// Several [TeX units] were ommitted for being obscure and useless: traditional
 /// points (1/72.27 in), (new) didots, (new) cieros, scaled points.

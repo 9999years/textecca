@@ -14,7 +14,9 @@ pub type Span<'input, Extra = ()> = LocatedSpan<&'input str, Extra>;
 /// A parse error.
 pub type Error<'input, Extra = ()> = VerboseError<Span<'input, Extra>>;
 
+/// A sequence of `RawToken`s.
 pub type RawTokens<'i> = Vec<RawToken<'i>>;
+/// A sequence of `Token`s.
 pub type Tokens<'i> = Vec<Token<'i>>;
 
 /// A minimally-parsed region of input.
@@ -29,6 +31,7 @@ pub enum RawToken<'i> {
     BlankLines(BlankLines<'i>),
 }
 
+/// A line in the parser input.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Line<'i> {
     indent: Span<'i>,

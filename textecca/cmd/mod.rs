@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::io::{self, Write};
+use std::rc::Rc;
 
 use thiserror::Error;
 
@@ -24,13 +25,27 @@ pub trait CommandInfo {
     /// command determines which regions of input represent the arguments to this
     /// command, this parser function is used to determine which regions of input
     /// *within* the arguments refer to other commands and their arguments.
+    ///
+    /// TODO: Default implementation.
     fn parser_fn(&self) -> Parser;
 }
 
 /// A command, which can be called to render itself as blocks to a particular
 /// `Serializer`.
 pub trait Command {
-    fn call(&mut self, env: &Environment, doc: &mut DocBuilder) -> Result<(), CommandError>;
+    /// Call (i.e. evaluate) the given `Command`.
+    ///
+    /// This pushes a number of blocks onto the given `DocBuilder`.
+    fn call(&mut self, env: Rc<Environment>, doc: &mut DocBuilder) -> Result<(), CommandError>;
+
+    /// Get the environment this command's arguments are evaluated in.
+    ///
+    /// For example, if this command's `Parser` transformed a `-` at the
+    /// beginning of a line into `\item`, the returned environment should have
+    /// `\item` bound.
+    fn environment(&self, parent: Rc<Environment>) -> Result<Environment, CommandError> {
+        Ok(Environment::new_inheriting(parent))
+    }
 }
 
 /// Arguments to a command.

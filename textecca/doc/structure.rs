@@ -8,20 +8,24 @@ use super::inlines::*;
 /// the future.
 pub type Meta = HashMap<String, String>;
 
+/// An entire document.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Doc {
     pub meta: DocMeta,
     pub content: Blocks,
 }
 
+/// Document metadata.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DocMeta {}
 
+/// A sequence of `Block`s.
 pub type Blocks = Vec<Block>;
 
+/// A block of content within a document, typically separated by vertical space.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
-    /// Text not in a paragraph.
+    /// Text not in a paragraph; this is treated as `Inlines`, but in a block context.
     Plain(Inlines),
 
     /// Paragraph.
@@ -51,11 +55,14 @@ pub enum Block {
     /// A concept; this could be a warning, definition, note, theorem, etc.
     Concept(Blocks),
 
+    /// Blocks tagged with some metadata.
     Tagged(Blocks),
 }
 
+/// A sequence of `Inline`s.
 pub type Inlines = Vec<Inline>;
 
+/// A span of inline content in a document.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Inline {
     /// Plain text.
@@ -64,10 +71,8 @@ pub enum Inline {
     /// Style instruction.
     Styled(Style),
 
+    /// An inline quotation.
     Quote(Quote),
-
-    /// Unsupported for now.
-    Citation(Citation),
 
     /// Inline code span.
     Code(String),
