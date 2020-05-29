@@ -31,16 +31,7 @@ impl Environment {
             .or_else(|| self.parent.as_ref().map(|env| env.cmd_info(name)).flatten())
     }
 
-    pub fn get_command<'i>(
-        self: Rc<Self>,
-        name: &str,
-        args: &mut ParsedArgs<'i>,
-    ) -> Option<Result<Box<dyn Command<'i> + 'i>, FromArgsError>> {
-        self.cmd_info(name).map(|info| (info.from_args_fn)(args))
-    }
-
     pub fn add_binding(&mut self, cmd_info: CommandInfo) {
         self.cmds.insert(cmd_info.name.clone(), cmd_info);
-        unimplemented!()
     }
 }

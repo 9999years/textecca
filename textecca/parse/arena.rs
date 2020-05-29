@@ -1,11 +1,16 @@
+use std::error::Error;
 use std::ops::Deref;
 
+use derivative::Derivative;
 use typed_arena::Arena;
 
-use super::Span;
+use super::{Parser, RawTokens, Span, Tokens};
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Source {
     src: String,
+    #[derivative(Debug = "ignore")]
     arena: Arena<String>,
 }
 
@@ -39,5 +44,20 @@ impl Source {
         unsafe {
             Span::new_from_raw_offset(loc.location_offset(), loc.location_line(), fragment, ())
         }
+    }
+}
+
+pub struct ParserArena<'i> {
+    arena: &'i Source,
+    parser: Parser,
+}
+
+impl<'i> ParserArena<'i> {
+    pub fn new(arena: &'i Source, parser: Parser) -> Self {
+        Self { arena, parser }
+    }
+
+    pub fn parse(&self, input: Span<'i>) -> Result<Tokens<'i>, Box<dyn Error>> {
+        (self.parser)(self.arena, input)
     }
 }

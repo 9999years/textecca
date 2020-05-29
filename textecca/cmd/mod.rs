@@ -4,6 +4,7 @@
 //! in the command's input are detected.
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
+use std::error;
 use std::io::{self, Write};
 use std::rc::Rc;
 
@@ -12,7 +13,7 @@ use thiserror::Error;
 
 use crate::doc::{Block, Blocks, DocBuilder};
 use crate::env::Environment;
-use crate::parse::{self, Argument, Parser, RawTokens, Tokens};
+use crate::parse::{self, Argument, Parser, RawTokens, Source, Tokens};
 
 mod default_cmd;
 mod thunk;
@@ -55,7 +56,7 @@ impl CommandInfo {
 /// `Serializer`.
 pub trait Command<'i> {
     /// Call (i.e. evaluate) the given `Command`.
-    fn call(self, env: Rc<Environment>) -> Result<Blocks, CommandError>;
+    fn call(self: Box<Self>, world: &World<'i>) -> Result<Blocks, CommandError>;
 
     /// Get the environment this command's arguments are evaluated in.
     ///
@@ -67,6 +68,12 @@ pub trait Command<'i> {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct World<'i> {
+    pub env: Rc<Environment>,
+    pub arena: &'i Source,
+}
+
 /// Arguments to a command.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParsedArgs<'i> {
@@ -75,20 +82,28 @@ pub struct ParsedArgs<'i> {
 }
 
 impl<'i> ParsedArgs<'i> {
-    pub fn from_unparsed(args: &[Argument<'i>]) -> Self {
+    pub fn from_unparsed(
+        args: &[Argument<'i>],
+        parser: Parser,
+        world: &World<'i>,
+    ) -> Result<Self, Box<dyn error::Error>> {
         let mut posargs = Vec::new();
         let mut kwargs = HashMap::new();
         for arg in args {
+            let value = parser(world.arena, arg.value)?.into();
             match arg.name {
                 Some(kw) => {
-                    kwargs.insert(kw.fragment().to_owned(), unimplemented!());
+                    kwargs.insert(kw.fragment().to_string(), value);
                 }
                 None => {
-                    posargs.push(unimplemented!());
+                    posargs.push(value);
                 }
             }
         }
-        ParsedArgs { args, kwargs }
+        Ok(ParsedArgs {
+            args: posargs,
+            kwargs,
+        })
     }
 }
 
@@ -126,7 +141,7 @@ impl FromArgsError {
 }
 
 /// An error while calling a `Command`.
-#[derive(Clone, Debug, PartialEq, Error)]
+#[derive(Debug, Error)]
 pub enum CommandError {
     #[error("Type error: {0}")]
     Type(String),
@@ -136,4 +151,7 @@ pub enum CommandError {
 
     #[error("Command {0} not defined in current environment")]
     Name(String),
+
+    #[error("Parse error: {0}")]
+    ParseError(Box<dyn error::Error>),
 }
