@@ -1,7 +1,11 @@
 //! Parsing textecca source.
 use std::borrow::Cow;
 
-use nom::error::VerboseError;
+use nom::{
+    combinator::map,
+    error::{ParseError, VerboseError},
+    IResult,
+};
 use nom_locate::LocatedSpan;
 
 mod arena;
@@ -109,4 +113,12 @@ impl<'i> From<Command<'i>> for Token<'i> {
 ///
 /// This makes textecca's markup language highly flexible, so care must be taken
 /// to make parsers that aren't confusing and don't behave unexpectedly.
-pub type Parser = for<'i> fn(RawTokens<'i>) -> Tokens<'i>;
+pub type Parser = for<'i> fn(arena: &'i Source, raw_tokens: RawTokens<'i>) -> Tokens<'i>;
+
+pub fn span_to_tokens<'i, E: ParseError<Span<'i>> + Clone>(
+    arena: &'i Source,
+    parser: Parser,
+) -> impl Fn(Span<'i>) -> IResult<Span<'i>, Tokens<'i>, E> {
+    // TODO: make this work and not evil
+    |span| map(|i| lex(arena, i), |tokens| parser(arena, tokens))(span)
+}

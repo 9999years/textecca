@@ -7,43 +7,62 @@ use std::convert::{TryFrom, TryInto};
 use std::io::{self, Write};
 use std::rc::Rc;
 
+use derivative::Derivative;
 use thiserror::Error;
 
 use crate::doc::{Block, Blocks, DocBuilder};
 use crate::env::Environment;
-use crate::parse::{Parser, RawTokens, Tokens};
+use crate::parse::{self, Argument, Parser, RawTokens, Tokens};
+
+mod default_cmd;
+mod thunk;
+
+pub use default_cmd::*;
+pub use thunk::*;
 
 /// Information about a particular command; its name, its parser, and how to construct it.
-pub trait CommandInfo {
+#[derive(Derivative, Clone)]
+#[derivative(Debug)]
+pub struct CommandInfo {
     /// The command's name.
-    fn name(&self) -> String;
-
+    pub name: String,
     /// A function to create a new instance of the `Command` from arguments.
-    fn from_args_fn(&self) -> FromArgs;
-
+    #[derivative(Debug = "ignore")]
+    pub from_args_fn: FromArgs,
     /// The command's argument parser. While the parser for the surrounding
     /// command determines which regions of input represent the arguments to this
     /// command, this parser function is used to determine which regions of input
     /// *within* the arguments refer to other commands and their arguments.
-    ///
-    /// TODO: Default implementation.
-    fn parser_fn(&self) -> Parser;
+    #[derivative(Debug = "ignore")]
+    pub parser_fn: Parser,
+}
+
+impl CommandInfo {
+    fn new(name: String, from_args_fn: FromArgs, parser_fn: Parser) -> Self {
+        Self {
+            name,
+            from_args_fn,
+            parser_fn,
+        }
+    }
+
+    fn from_name_and_args(name: String, from_args_fn: FromArgs) -> Self {
+        Self::new(name, from_args_fn, parse::default_parser)
+    }
 }
 
 /// A command, which can be called to render itself as blocks to a particular
 /// `Serializer`.
-pub trait Command {
+pub trait Command<'i> {
     /// Call (i.e. evaluate) the given `Command`.
-    ///
-    /// This pushes a number of blocks onto the given `DocBuilder`.
-    fn call(&mut self, env: Rc<Environment>, doc: &mut DocBuilder) -> Result<(), CommandError>;
+    fn call(self, env: Rc<Environment>) -> Result<Blocks, CommandError>;
 
     /// Get the environment this command's arguments are evaluated in.
     ///
     /// For example, if this command's `Parser` transformed a `-` at the
     /// beginning of a line into `\item`, the returned environment should have
     /// `\item` bound.
-    fn environment(&self, parent: Rc<Environment>) -> Result<Environment, CommandError> {
+    fn environment(&self, parent: Rc<Environment>) -> Result<Rc<Environment>, CommandError> {
         Ok(Environment::new_inheriting(parent))
     }
 }
@@ -51,12 +70,31 @@ pub trait Command {
 /// Arguments to a command.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParsedArgs<'i> {
-    pub args: Vec<Tokens<'i>>,
-    pub kwargs: HashMap<String, Tokens<'i>>,
+    pub args: Vec<Thunk<'i>>,
+    pub kwargs: HashMap<String, Thunk<'i>>,
+}
+
+impl<'i> ParsedArgs<'i> {
+    pub fn from_unparsed(args: &[Argument<'i>]) -> Self {
+        let mut posargs = Vec::new();
+        let mut kwargs = HashMap::new();
+        for arg in args {
+            match arg.name {
+                Some(kw) => {
+                    kwargs.insert(kw.fragment().to_owned(), unimplemented!());
+                }
+                None => {
+                    posargs.push(unimplemented!());
+                }
+            }
+        }
+        ParsedArgs { args, kwargs }
+    }
 }
 
 /// A `Command` constructor function.
-pub type FromArgs = fn(ParsedArgs) -> Result<Box<dyn Command>, FromArgsError>;
+pub type FromArgs =
+    for<'i> fn(&mut ParsedArgs<'i>) -> Result<Box<dyn Command<'i> + 'i>, FromArgsError>;
 
 /// An error when constructing a `Command` from a `ParsedArgs` instance.
 ///
@@ -64,22 +102,38 @@ pub type FromArgs = fn(ParsedArgs) -> Result<Box<dyn Command>, FromArgsError>;
 /// missing keywords, unknown keyword arguments, etc.
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum FromArgsError {
-    /// A positional argument after varargs is given.
-    #[error("Too few args; given {given} but needed at least {needed}. Missing values for arguments {missing:?}")]
-    NotEnoughArgs {
-        given: u32,
-        needed: u32,
-        missing: Vec<String>,
-    },
+    #[error("Too few args")]
+    NotEnough,
+
+    #[error("Too many args")]
+    TooMany,
 
     /// A keyword-only argument, mandatory or optional, is used positionally.
     #[error("Arg {0} requires a keyword")]
     MissingKeyword(String),
+
+    #[error("Unknown kwarg(s) {0}")]
+    UnexpectedKeyword(String),
+}
+
+impl FromArgsError {
+    pub fn from_extra_kwargs(parsed: &ParsedArgs<'_>) -> Self {
+        FromArgsError::UnexpectedKeyword(itertools::join(
+            parsed.kwargs.keys().map(|k| format!("{:?}", k)),
+            ",",
+        ))
+    }
 }
 
 /// An error while calling a `Command`.
 #[derive(Clone, Debug, PartialEq, Error)]
 pub enum CommandError {
     #[error("Type error: {0}")]
-    TypeError(String),
+    Type(String),
+
+    #[error("Args error: {0}")]
+    FromArgs(#[from] FromArgsError),
+
+    #[error("Command {0} not defined in current environment")]
+    Name(String),
 }

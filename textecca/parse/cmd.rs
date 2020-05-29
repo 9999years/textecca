@@ -20,8 +20,8 @@ use super::Span;
 /// A parsed command, consisting of a name and arguments.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Command<'i> {
-    name: Span<'i>,
-    args: Vec<Argument<'i>>,
+    pub name: Span<'i>,
+    pub args: Vec<Argument<'i>>,
 }
 
 impl<'i> Command<'i> {
@@ -37,8 +37,8 @@ impl<'i> Command<'i> {
 /// An argument to a command.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Argument<'i> {
-    name: Option<Span<'i>>,
-    value: Span<'i>,
+    pub name: Option<Span<'i>>,
+    pub value: Span<'i>,
 }
 
 impl<'i> Argument<'i> {

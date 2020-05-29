@@ -14,8 +14,10 @@ use super::parse_util::*;
 use super::{BlankLines, Line, RawToken, RawTokens, Source, Span};
 
 /// Transform `&str` input into `RawTokens`.
-pub fn lex<'i, E: ParseError<Span<'i>> + Clone>(src: &'i Source) -> IResult<Span, RawTokens, E> {
-    let input = Span::new(&src);
+pub fn lex<'i, E: ParseError<Span<'i>> + Clone>(
+    src: &'i Source,
+    input: Span<'i>,
+) -> IResult<Span<'i>, RawTokens<'i>, E> {
     let mut it = iterator(
         input,
         map(
