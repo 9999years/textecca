@@ -8,17 +8,19 @@ use nom::{
 use claim::*;
 use pretty_assertions::assert_eq;
 
-use super::Span;
+use super::{Source, Span};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Input {
     pub span: Span<'static>,
+    pub arena: Source,
 }
 
 impl Input {
     pub fn new(input: &'static str) -> Self {
         Self {
             span: Span::new(input),
+            arena: Source::new(input.to_owned()),
         }
     }
 

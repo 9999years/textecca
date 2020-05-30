@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take as take_bytes},
     bytes::streaming::{take_while, take_while1},
-    character::complete::{anychar, char as take_char, none_of, one_of},
+    character::complete::{anychar, char as take_char, line_ending, none_of, one_of},
     combinator::*,
     error::{make_error, ErrorKind, ParseError},
     multi::*,
@@ -15,7 +15,7 @@ use super::ucd_tables::{general_category, property_bool};
 use super::Span;
 
 /// Drops the result of a parser.
-pub fn drop_parser<I, O, E, F>(f: F) -> impl Fn(I) -> IResult<I, (), E>
+pub fn discard<I, O, E, F>(f: F) -> impl Fn(I) -> IResult<I, (), E>
 where
     I: Clone,
     E: ParseError<I>,
@@ -38,6 +38,11 @@ where
 /// Succeeds if there's no remaining input, errors otherwise.
 pub fn eof<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, (), E> {
     not(take_bytes(1usize))(i)
+}
+
+/// Parses a newline, i.e. `\r\n` or `\n`.
+pub fn newline<'i, E: ParseError<Span<'i>>>(i: Span<'i>) -> IResult<Span, Span, E> {
+    line_ending(i)
 }
 
 /// True if `c` is of [category] `N`.

@@ -1,0 +1,29 @@
+[package]
+name = "textecca-bin"
+version = "0.0.1-alpha"
+authors = ["Rebecca Turner <rbt@sent.as>"]
+edition = "2018"
+description = "A markup language for richly interactive documents."
+# documentaton = ""
+readme = "README.md"
+repository = "https://github.com/9999years/textecca"
+license = "AGPL-3.0"
+keywords = ["markup", "typesetting", "programming-language"]
+categories = [
+    "parser-implementations",
+    "text-processing",
+    "command-line-utilities"
+]
+
+[[bin]]
+name = "textecca-bin"
+path = "main.rs"
+
+[dependencies]
+"textecca" = { path = "../textecca" }
+structopt = "0.3.14"
+thiserror = "1.0.19"
+
+[dev-dependencies]
+pretty_assertions = "0.6.1"  # Better assert_eq! and assert_ne! macros.
+indoc = "0.3.5" # Indented multiline strings.

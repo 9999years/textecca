@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 use derivative::Derivative;
 
-use crate::cmd::{Command, CommandInfo, FromArgs, FromArgsError, ParsedArgs};
-use crate::parse::Parser;
+use crate::cmd::{Command, CommandError, CommandInfo, FromArgs, FromArgsError, ParsedArgs, World};
+use crate::parse::{self, Parser};
 
 /// An evaluation environment, mapping command names to bindings and inheriting
 /// from a parent environment.
@@ -17,6 +17,10 @@ pub struct Environment {
 }
 
 impl Environment {
+    pub fn new() -> Rc<Self> {
+        Rc::new(Default::default())
+    }
+
     /// Creates a new environment inheriting from this one.
     pub fn new_inheriting(self: Rc<Self>) -> Rc<Self> {
         Rc::new(Self {
@@ -25,10 +29,16 @@ impl Environment {
         })
     }
 
-    pub fn cmd_info(&self, name: &str) -> Option<&CommandInfo> {
+    pub fn cmd_info(&self, name: &str) -> Result<&CommandInfo, CommandError<'static>> {
         self.cmds
             .get(name)
-            .or_else(|| self.parent.as_ref().map(|env| env.cmd_info(name)).flatten())
+            .or_else(|| {
+                self.parent
+                    .as_ref()
+                    .map(|env| env.cmd_info(name).ok())
+                    .flatten()
+            })
+            .ok_or_else(|| CommandError::Name(name.to_owned()))
     }
 
     pub fn add_binding(&mut self, cmd_info: CommandInfo) {

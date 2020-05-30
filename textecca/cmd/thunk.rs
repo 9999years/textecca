@@ -5,9 +5,12 @@ use crate::doc::{Block, Blocks, Inline};
 use crate::env::Environment;
 use crate::parse::{Source, Token, Tokens};
 
+/// A lazily-evaluated `Command` argument.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Thunk<'i> {
+    /// An unevaluated sequence of `Tokens`.
     Lazy(Tokens<'i>),
+    /// An evaluated sequence of `Blocks`.
     Forced(Blocks),
 }
 
@@ -24,6 +27,7 @@ impl<'i> From<Blocks> for Thunk<'i> {
 }
 
 impl<'i> Thunk<'i> {
+    /// Evaluate this thunk if it's `Lazy`, otherwise, return its `Blocks`.
     pub fn force(self, world: &World<'i>) -> Result<Blocks, CommandError<'i>> {
         match self {
             Self::Lazy(tokens) => {
@@ -34,16 +38,7 @@ impl<'i> Thunk<'i> {
                             ret.push(Block::Plain(vec![Inline::Text(sp.to_string())]));
                         }
                         Token::Command(cmd) => {
-                            let name = *cmd.name.fragment();
-                            let info = world
-                                .env
-                                .cmd_info(name)
-                                .ok_or_else(|| CommandError::Name(name.to_string()))?;
-                            let mut args =
-                                ParsedArgs::from_unparsed(&cmd.args, info.parser_fn, world)
-                                    .map_err(CommandError::ParseError)?;
-                            let cmd = (info.from_args_fn)(&mut args)?;
-                            ret.append(&mut cmd.call(world)?);
+                            ret.append(&mut world.call_cmd(cmd)?);
                         }
                     }
                 }

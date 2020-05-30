@@ -15,9 +15,11 @@ use crate::doc::{Block, Blocks, DocBuilder};
 use crate::env::Environment;
 use crate::parse::{self, Argument, Parser, RawTokens, Source, Tokens};
 
+mod args;
 mod default_cmd;
 mod thunk;
 
+pub use args::*;
 pub use default_cmd::*;
 pub use thunk::*;
 
@@ -54,7 +56,7 @@ impl CommandInfo {
 
 /// A command, which can be called to render itself as blocks to a particular
 /// `Serializer`.
-pub trait Command<'i> {
+pub trait Command<'i>: std::fmt::Debug {
     /// Call (i.e. evaluate) the given `Command`.
     fn call(self: Box<Self>, world: &World<'i>) -> Result<Blocks, CommandError<'i>>;
 
@@ -75,70 +77,20 @@ pub struct World<'i> {
     pub arena: &'i Source,
 }
 
-/// Arguments to a command.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParsedArgs<'i> {
-    pub args: Vec<Thunk<'i>>,
-    pub kwargs: HashMap<String, Thunk<'i>>,
-}
-
-impl<'i> ParsedArgs<'i> {
-    pub fn from_unparsed(
-        args: &[Argument<'i>],
-        parser: Parser,
-        world: &World<'i>,
-    ) -> Result<Self, Box<dyn error::Error + 'i>> {
-        let mut posargs = Vec::new();
-        let mut kwargs = HashMap::new();
-        for arg in args {
-            // TODO: Handle various errors relating to kwargs in incorrect places.
-            let value = parser(world.arena, arg.value)?.into();
-            match arg.name {
-                Some(kw) => {
-                    kwargs.insert(kw.fragment().to_string(), value);
-                }
-                None => {
-                    posargs.push(value);
-                }
-            }
-        }
-        Ok(ParsedArgs {
-            args: posargs,
-            kwargs,
-        })
+impl<'i> World<'i> {
+    pub fn get_cmd(
+        &self,
+        cmd: parse::Command<'i>,
+    ) -> Result<Box<dyn Command<'i> + 'i>, CommandError<'i>> {
+        let name = *cmd.name.fragment();
+        let info = self.env.cmd_info(name)?;
+        let mut args = ParsedArgs::from_unparsed(&cmd.args, info.parser_fn, self)
+            .map_err(CommandError::ParseError)?;
+        Ok((info.from_args_fn)(&mut args)?)
     }
-}
 
-/// A `Command` constructor function.
-pub type FromArgs =
-    for<'i> fn(&mut ParsedArgs<'i>) -> Result<Box<dyn Command<'i> + 'i>, FromArgsError>;
-
-/// An error when constructing a `Command` from a `ParsedArgs` instance.
-///
-/// Errors typically relate to arity mismatches (too few / too many arguments),
-/// missing keywords, unknown keyword arguments, etc.
-#[derive(Error, Debug, Clone, PartialEq)]
-pub enum FromArgsError {
-    #[error("Too few args")]
-    NotEnough,
-
-    #[error("Too many args")]
-    TooMany,
-
-    /// A keyword-only argument, mandatory or optional, is used positionally.
-    #[error("Arg {0} requires a keyword")]
-    MissingKeyword(String),
-
-    #[error("Unknown kwarg(s) {0}")]
-    UnexpectedKeyword(String),
-}
-
-impl FromArgsError {
-    pub fn from_extra_kwargs(parsed: &ParsedArgs<'_>) -> Self {
-        FromArgsError::UnexpectedKeyword(itertools::join(
-            parsed.kwargs.keys().map(|k| format!("{:?}", k)),
-            ",",
-        ))
+    pub fn call_cmd(&self, cmd: parse::Command<'i>) -> Result<Blocks, CommandError<'i>> {
+        self.get_cmd(cmd)?.call(self)
     }
 }
 

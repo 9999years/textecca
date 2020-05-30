@@ -7,8 +7,9 @@ use crate::doc::Blocks;
 use crate::env::Environment;
 use crate::parse::{Parser, Tokens};
 
-const DEFAULT_COMMAND_NAME: &str = "\u{e70a}default";
+const DEFAULT_COMMAND_NAME: &str = "__default__";
 
+#[derive(Debug)]
 pub struct DefaultCommand<'i> {
     doc: Thunk<'i>,
 }
@@ -17,14 +18,8 @@ impl<'i> DefaultCommand<'i> {
     fn from_args<'a>(
         parsed: &mut ParsedArgs<'a>,
     ) -> Result<Box<dyn Command<'a> + 'a>, FromArgsError> {
-        let doc = parsed.args.pop().ok_or(FromArgsError::NotEnough)?;
-        if parsed.args.len() != 1 {
-            return Err(FromArgsError::TooMany);
-        }
-        if !parsed.kwargs.is_empty() {
-            return Err(FromArgsError::from_extra_kwargs(parsed));
-        }
-
+        let doc = parsed.pop_positional()?;
+        parsed.check_no_args()?;
         Ok(Box::new(DefaultCommand { doc }))
     }
 
