@@ -57,7 +57,7 @@ impl<'i> ParserArena<'i> {
         Self { arena, parser }
     }
 
-    pub fn parse(&self, input: Span<'i>) -> Result<Tokens<'i>, Box<dyn Error>> {
+    pub fn parse(&self, input: Span<'i>) -> Result<Tokens<'i>, Box<dyn Error + 'i>> {
         (self.parser)(self.arena, input)
     }
 }

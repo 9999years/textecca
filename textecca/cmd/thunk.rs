@@ -24,7 +24,7 @@ impl<'i> From<Blocks> for Thunk<'i> {
 }
 
 impl<'i> Thunk<'i> {
-    pub fn force(self, world: &World<'i>) -> Result<Blocks, CommandError> {
+    pub fn force(self, world: &World<'i>) -> Result<Blocks, CommandError<'i>> {
         match self {
             Self::Lazy(tokens) => {
                 let mut ret = Vec::with_capacity(tokens.len());

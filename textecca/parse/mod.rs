@@ -58,4 +58,4 @@ impl<'i> From<Command<'i>> for Token<'i> {
 /// This makes textecca's markup language highly flexible, so care must be taken
 /// to make parsers that aren't confusing and don't behave unexpectedly.
 pub type Parser =
-    for<'i> fn(arena: &'i Source, input: Span<'i>) -> Result<Tokens<'i>, Box<dyn Error>>;
+    for<'i> fn(arena: &'i Source, input: Span<'i>) -> Result<Tokens<'i>, Box<dyn Error + 'i>>;

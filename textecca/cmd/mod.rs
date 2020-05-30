@@ -56,7 +56,7 @@ impl CommandInfo {
 /// `Serializer`.
 pub trait Command<'i> {
     /// Call (i.e. evaluate) the given `Command`.
-    fn call(self: Box<Self>, world: &World<'i>) -> Result<Blocks, CommandError>;
+    fn call(self: Box<Self>, world: &World<'i>) -> Result<Blocks, CommandError<'i>>;
 
     /// Get the environment this command's arguments are evaluated in.
     ///
@@ -68,6 +68,7 @@ pub trait Command<'i> {
     }
 }
 
+/// An evaluation context for `Command`s.
 #[derive(Debug, Clone)]
 pub struct World<'i> {
     pub env: Rc<Environment>,
@@ -86,10 +87,11 @@ impl<'i> ParsedArgs<'i> {
         args: &[Argument<'i>],
         parser: Parser,
         world: &World<'i>,
-    ) -> Result<Self, Box<dyn error::Error>> {
+    ) -> Result<Self, Box<dyn error::Error + 'i>> {
         let mut posargs = Vec::new();
         let mut kwargs = HashMap::new();
         for arg in args {
+            // TODO: Handle various errors relating to kwargs in incorrect places.
             let value = parser(world.arena, arg.value)?.into();
             match arg.name {
                 Some(kw) => {
@@ -142,7 +144,7 @@ impl FromArgsError {
 
 /// An error while calling a `Command`.
 #[derive(Debug, Error)]
-pub enum CommandError {
+pub enum CommandError<'i> {
     #[error("Type error: {0}")]
     Type(String),
 
@@ -153,5 +155,5 @@ pub enum CommandError {
     Name(String),
 
     #[error("Parse error: {0}")]
-    ParseError(Box<dyn error::Error>),
+    ParseError(Box<dyn error::Error + 'i>),
 }

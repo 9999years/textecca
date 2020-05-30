@@ -34,7 +34,7 @@ impl<'i> DefaultCommand<'i> {
 }
 
 impl<'i> Command<'i> for DefaultCommand<'i> {
-    fn call(self: Box<Self>, world: &World<'i>) -> Result<Blocks, CommandError> {
+    fn call(self: Box<Self>, world: &World<'i>) -> Result<Blocks, CommandError<'i>> {
         Ok(self.doc.force(world)?)
     }
 }

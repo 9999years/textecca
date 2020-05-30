@@ -100,7 +100,7 @@ fn command_name<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span,
 }
 
 /// Parse a command and at least `mandatory_args` args.
-pub fn command<'a, E: ParseError<Span<'a>>>(
+pub fn parse_command<'a, E: ParseError<Span<'a>>>(
     mandatory_args: usize,
 ) -> impl Fn(Span<'a>) -> IResult<Span, Command, E> {
     context(
@@ -208,7 +208,7 @@ mod test {
     #[test]
     fn test_command() {
         // "At least 0 args" will absorb the 1 arg.
-        let (input, res) = test_parse!(command(0), "\\x {y}");
+        let (input, res) = test_parse!(parse_command(0), "\\x {y}");
         assert_parsed_all!(input, res);
         assert_destructure! {
             let Ok((_, cmd)) = res;
@@ -224,7 +224,7 @@ mod test {
         }
 
         // Here we have 1 arg.
-        let (input, res) = test_parse!(command(1), "\\section{Whatever}");
+        let (input, res) = test_parse!(parse_command(1), "\\section{Whatever}");
         assert_parsed_all!(input, res);
         assert_destructure! {
             let Ok((_, cmd)) = res;
@@ -240,7 +240,7 @@ mod test {
         }
 
         // We don't have 3 arguments
-        let (_input, res) = test_parse!(command(3), "\\section{Whatever}");
+        let (_input, res) = test_parse!(parse_command(3), "\\section{Whatever}");
         assert_err!(res);
     }
 }
