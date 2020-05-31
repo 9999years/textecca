@@ -9,7 +9,9 @@ use crate::parse::{Argument, Parser};
 /// Arguments to a command.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParsedArgs<'i> {
+    /// Positional arguments.
     pub args: VecDeque<Thunk<'i>>,
+    /// Keyword arguments.
     pub kwargs: HashMap<String, Thunk<'i>>,
 }
 
@@ -81,9 +83,11 @@ pub type FromArgs =
 /// missing keywords, unknown keyword arguments, etc.
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum FromArgsError {
+    /// Too few arguments were given.
     #[error("Too few args")]
     TooFew,
 
+    /// Too many arguments were given.
     #[error("Too many args")]
     TooMany,
 
@@ -91,11 +95,13 @@ pub enum FromArgsError {
     #[error("Arg {0} requires a keyword")]
     MissingKeyword(String),
 
+    /// An unexpected keyword argument was given.
     #[error("Unknown kwarg(s) {0}")]
     UnexpectedKeyword(String),
 }
 
 impl FromArgsError {
+    /// Create an `UnexpectedKeyword` error from the remaining kwargs in `ParsedArgs`.
     pub fn from_extra_kwargs(parsed: &ParsedArgs<'_>) -> Self {
         FromArgsError::UnexpectedKeyword(itertools::join(
             parsed.kwargs.keys().map(|k| format!("{:?}", k)),

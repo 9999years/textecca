@@ -4,8 +4,18 @@ use std::ops::Deref;
 use derivative::Derivative;
 use typed_arena::Arena;
 
-use super::{Parser, RawTokens, Span, Tokens};
+use super::{Parser, Span, Tokens};
 
+/// Source code tied to an arena allocator of strings.
+///
+/// Because textecca `Parser`s may produce tokens unrelated to (or at least
+/// containing text not found in) their input, they need to be able to produce
+/// `Span`s of arbitrary text with the same lifetime as the source. By bundling
+/// an arena allocator with the owned source code, an `&'i Source` reference will
+/// allow extracting `Span<'i>`s from the input or creating novel `Span<'i>`s
+/// with the allocator.
+///
+/// No, a `Cow<'i, str>` doesn't work here, unfortunately.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Source {
@@ -46,11 +56,13 @@ impl Deref for Source {
 }
 
 impl Source {
+    /// Create a new source-arena.
     pub fn new(src: String) -> Self {
         let cap = src.len() / 16;
         Self::with_capacity(src, cap)
     }
 
+    /// Create a new source-arena with the given capacity for new tokens.
     pub fn with_capacity(src: String, n: usize) -> Self {
         Self {
             src,
@@ -84,16 +96,19 @@ impl Source {
     }
 }
 
+/// A `Parser` bundled with a `Source`-arena.
 pub struct ParserArena<'i> {
     arena: &'i Source,
     parser: Parser,
 }
 
 impl<'i> ParserArena<'i> {
+    /// Create a new `ParserArena` from the given `Source` and `Parser`.
     pub fn new(arena: &'i Source, parser: Parser) -> Self {
         Self { arena, parser }
     }
 
+    /// Parse the given input with this arena's `Parser`.
     pub fn parse(&self, input: Span<'i>) -> Result<Tokens<'i>, Box<dyn Error + 'i>> {
         (self.parser)(self.arena, input)
     }

@@ -4,11 +4,11 @@ use super::{
     Command, CommandError, CommandInfo, FromArgs, FromArgsError, ParsedArgs, Thunk, World,
 };
 use crate::doc::Blocks;
-use crate::env::Environment;
-use crate::parse::{Parser, Tokens};
+use crate::parse::Parser;
 
 const DEFAULT_COMMAND_NAME: &str = "__default__";
 
+/// The "default command"; essentially specifies the parser to be used at the top-level.
 #[derive(Debug)]
 pub struct DefaultCommand<'i> {
     doc: Thunk<'i>,
@@ -22,9 +22,15 @@ impl<'i> DefaultCommand<'i> {
         parsed.check_no_args()?;
         Ok(Box::new(DefaultCommand { doc }))
     }
+}
 
-    pub fn info() -> CommandInfo {
-        CommandInfo::from_name_and_args(DEFAULT_COMMAND_NAME.to_owned(), Self::from_args)
+impl<'i> CommandInfo for DefaultCommand<'i> {
+    fn name() -> String {
+        DEFAULT_COMMAND_NAME.to_owned()
+    }
+
+    fn from_args_fn() -> FromArgs {
+        Self::from_args
     }
 }
 

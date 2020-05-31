@@ -58,16 +58,27 @@ pub enum QuoteKind {
 /// Styled text.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Style {
+    /// Emphasized text, typically displayed with italics.
     Emph,
+    /// Strong text, typically displayed with bold.
     Strong,
+    /// Superscript text.
     Superscript,
+    /// Subscript text.
     Subscript,
+    /// Small-caps text.
     SmallCaps,
+    /// Struck-out text.
     Strikeout,
+    /// Underlined text.
     Underline,
+    /// Text in a given size.
     Size(Length),
+    /// Text in a given color.
     Color(Color),
+    /// Text in a given font.
     Font(Font),
+    /// Text with the given font-features activated.
     FontFeatures(FontFeatures),
 }
 

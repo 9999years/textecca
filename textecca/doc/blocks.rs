@@ -39,15 +39,22 @@ pub struct TableColumn {
 /// A `Table` column's alignment.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Alignment {
+    /// Left-aligned.
     Left,
+    /// Right-aligned.
     Right,
+    /// Center-aligned.
     Center,
+    /// Justified.
+    Justify,
 }
 
 /// A document heading.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Heading {
+    /// The heading's level in the document hierarchy.
     pub level: i32,
+    /// The heading's text.
     pub text: Inlines,
 }
 
@@ -77,8 +84,10 @@ enum HeadingLevel {
 /// A list, ordered, unordered, or of defined terms.
 #[derive(Debug, Clone, PartialEq)]
 pub struct List {
-    kind: ListKind,
-    items: Vec<ListItem>,
+    /// The list's kind.
+    pub kind: ListKind,
+    /// The list's items.
+    pub items: Vec<ListItem>,
 }
 
 /// A `List`'s type.
@@ -112,6 +121,72 @@ pub enum ListKind {
 pub struct ListItem {
     /// This item's label; if empty, the `Serializer` may substitute any value it
     /// sees fit.
-    label: Option<Inlines>,
-    content: Blocks,
+    pub label: Option<Inlines>,
+    /// This item's content.
+    pub content: Blocks,
+}
+
+/// A list, ordered, unordered, or of defined terms.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TermListItem {
+    /// This item's label.
+    pub term: Inlines,
+    /// This item's content.
+    pub content: Blocks,
+}
+
+/// A figure, i.e. a captioned diagram, image, or similar.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Figure {
+    /// The kind of figure.
+    pub kind: FigureKind,
+    /// The figure's caption.
+    pub caption: Inlines,
+    /// The figure's content, i.e. the image/diagram/table/etc.
+    pub content: Blocks,
+}
+
+/// The kind of figure, used for labelling.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FigureKind {
+    /// A figure, diagram, etc.
+    Figure,
+    /// A table of data.
+    Table,
+    /// A code listing.
+    Listing,
+    /// Some other value.
+    Other(String),
+}
+
+/// A defined object; a definition of a term, a theorem, an article, etc.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Defn {
+    /// The defined object's name. For a term definition, this would be the term.
+    /// For a Wikipedia article, it would be the article title.
+    pub name: Inlines,
+    /// The definition's summary. Roughly equivalent to the first sentence of a
+    /// Wikipedia article. The summary allows multiple blocks for displayed
+    /// equations, code snippets, or figures.
+    pub summary: Blocks,
+    /// Extra content; can provide more elaborate detail, examples, or other information. May be empty.
+    pub content: Blocks,
+}
+
+/// A code listing.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Code {
+    /// The code's language, for highlighting. `"plain"` indicates no highlighting.
+    pub language: String,
+    /// The line numbering scheme to use, if any.
+    pub line_numbers: Option<LineNumbers>,
+    /// The lines of code themselves.
+    pub lines: Vec<Inlines>,
+}
+
+/// A `Code` listing's line numbers, if any.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineNumbers {
+    /// The starting line number.
+    pub start: i32,
 }

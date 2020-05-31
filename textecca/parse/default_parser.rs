@@ -13,7 +13,7 @@ use nom::{
 };
 
 use super::parse_util::*;
-use super::{lex, parse_command, Command, Parser, Source, Span, Token, Tokens};
+use super::{parse_command, Command, Parser, Source, Span, Token, Tokens};
 
 /// The default textecca parser.
 pub fn default_parser<'i>(

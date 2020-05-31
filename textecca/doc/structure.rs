@@ -9,15 +9,26 @@ use super::inlines::*;
 pub type Meta = HashMap<String, String>;
 
 /// An entire document.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Doc {
+    /// Document metadata.
     pub meta: DocMeta,
+    /// Document content.
     pub content: Blocks,
 }
 
+impl Doc {
+    /// Create a document from the given `Blocks`.
+    pub fn from_content(content: Blocks) -> Self {
+        Self {
+            content,
+            ..Default::default()
+        }
+    }
+}
+
 /// Document metadata.
-#[derive(Debug, Clone, PartialEq)]
-pub struct DocMeta {}
+pub type DocMeta = HashMap<String, String>;
 
 /// A sequence of `Block`s.
 pub type Blocks = Vec<Block>;
@@ -29,7 +40,7 @@ pub enum Block {
     Plain(Inlines),
 
     /// Paragraph.
-    Para(Inlines),
+    Par(Inlines),
 
     /// Code block.
     Code(Inlines),
@@ -37,8 +48,11 @@ pub enum Block {
     /// Block quote.
     Quote(Blocks),
 
-    /// A list; ordered, unordered, or definitions.
+    /// An ordered (numbered) or unordered (bulleted) list.
     List(List),
+
+    /// A definition list, matching terms to their definitions.
+    TermList(Vec<TermListItem>),
 
     /// A heading, or more accurately a document division.
     Heading(Heading),
@@ -50,10 +64,10 @@ pub enum Block {
     Table(Table),
 
     /// A figure-like block; a diagram, image, or similar.
-    Figure(Blocks),
+    Figure(Figure),
 
     /// A concept; this could be a warning, definition, note, theorem, etc.
-    Concept(Blocks),
+    Defn(Defn),
 
     /// Blocks tagged with some metadata.
     Tagged(Blocks),

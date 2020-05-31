@@ -9,13 +9,21 @@
 /// [TeX units]: https://en.wikibooks.org/wiki/LaTeX/Lengths#Units
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Length {
+    /// An absolute length, convertible to final dimensions, e.g. pixels, inches, etc.
     Absolute(AbsLength),
+    /// A relative length, which requires additional information about the document to resolve.
     Relative(RelLength),
 }
 
 /// An absolute length, i.e. resolvable immediately to points.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AbsLength {
+    /// Pixels.
+    ///
+    /// [Defined to be 1/96 in by the W3C.][css-abs-units]
+    ///
+    /// [css-abs-units]: https://www.w3.org/TR/css3-values/#absolute-lengths
+    Px(f64),
     /// Point = 1/72 in.
     ///
     /// More formally, this is a "big point". Traditionally, a point has measured
@@ -44,6 +52,7 @@ impl From<AbsLength> for Point {
             AbsLength::In(l) => l * 72.0,
             AbsLength::Cm(l) => l * 28.346_457,
             AbsLength::Mm(l) => l * 2.834_645_7,
+            AbsLength::Px(l) => l * 1.333_333_333, // https://www.w3.org/TR/css3-values/#absolute-lengths
         })
     }
 }

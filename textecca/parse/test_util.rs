@@ -1,9 +1,14 @@
+use std::fmt;
+use std::marker::PhantomData;
+
 use nom::{
     combinator::map,
     error::{ErrorKind, ParseError},
     multi::separated_nonempty_list,
     IResult, InputLength, Slice,
 };
+
+use typed_builder::TypedBuilder;
 
 use claim::*;
 use pretty_assertions::assert_eq;
@@ -41,15 +46,51 @@ impl Input {
 
     /// Get a span from a given offset and substring.
     pub fn offset(&self, offset: usize, fragment: &'static str) -> Span {
-        let ret = self.span.slice(offset..offset + fragment.len());
-        if ret.fragment() != &fragment {
+        let bad_offset = offset > self.span.fragment().len()
+            || offset + fragment.len() > self.span.fragment().len();
+        let ret = if bad_offset {
+            None
+        } else {
+            Some(self.span.slice(offset..offset + fragment.len()))
+        };
+        if ret.map(|ret| ret.fragment() != &fragment).unwrap_or(true) {
+            let probable_index = self
+                .span
+                .fragment()
+                // Find the leftmost occurance of `fragment` after `offset`...
+                .match_indices(fragment)
+                .find(|(i, _)| i > &offset)
+                .or_else(|| {
+                    // Or, if no occurance was found, find the last occurance of
+                    // `fragment` *before* `offset`.
+                    self.span
+                        .fragment()
+                        .rmatch_indices(fragment)
+                        .find(|(i, _)| i < &offset)
+                })
+                .map(|(i, _)| {
+                    format!(
+                        "\nI found that fragment at {}..{}. Did you mean that offset?",
+                        i,
+                        i + fragment.len()
+                    )
+                })
+                .unwrap_or_default();
             panic!(
-                "Fragment {:#?} doesn't match span: {:#?}",
-                fragment,
-                ret.fragment()
+                "Fragment {fragment:#?} at {start}..{end} {ret}{probable}",
+                fragment = fragment,
+                start = offset,
+                end = offset + fragment.len(),
+                ret = ret
+                    .map(|ret| format!("doesn't match span: {:#?}", ret.fragment()))
+                    .unwrap_or_else(|| format!(
+                        "out of bounds starting at index {}",
+                        self.span.fragment().len()
+                    )),
+                probable = probable_index
             );
         }
-        ret
+        ret.unwrap()
     }
 
     pub fn slice<R>(&self, range: R) -> Span
@@ -66,90 +107,61 @@ impl Into<&'static str> for Input {
     }
 }
 
-#[macro_export]
-macro_rules! test_parse {
-    ($parse:expr, $input:expr) => {{
-        let input = Input::new($input);
-        let parsed: IResult<_, _, (_, ErrorKind)> = $parse(input.span);
-        (input, parsed)
-    }};
-    ($parse:expr, $input:expr,) => {
-        parase!($parse, $input);
-    };
+fn assert_parse_err(e: impl fmt::Debug) {
+    panic!("Unexpected Err(nom::Err::Failure({:#?})).", e);
 }
 
-#[macro_export]
-macro_rules! assert_parsed_all {
-    ($input:expr, $res:expr) => {
-        ::claim::assert_ok!(&$res);
-        assert_eq!($input.eof(), $res.as_ref().unwrap().0);
-    };
+fn assert_parse_incomplete(needed: nom::Needed) {
+    panic!("Unexpected Err(nom::Err::Incomplete({:#?})).", needed);
 }
 
-#[macro_export]
-macro_rules! assert_destructure {
-    {let $pat:pat = $val:expr; $asserts:block } => {
-        if let $pat = $val {
-            $asserts
-        } else {
-            panic!(
-                "assertion failed, expression doesn't match pattern.\nexpected: {}\nactual: {:#?}",
-                stringify!($pat),
-                $val
-            );
-        }
-    };
+#[derive(TypedBuilder)]
+pub struct AssertParse<Parser, O> {
+    parser: Parser,
+
+    #[builder(default = false)]
+    all_consuming: bool,
+
+    #[builder(default=Box::new(|_i, _output| ()))]
+    ok: Box<dyn Fn(&Input, O) -> ()>,
+
+    #[builder(default=Box::new(|err| assert_parse_err(err)))]
+    err: Box<dyn Fn((Span<'static>, ErrorKind)) -> ()>,
+
+    #[builder(default=Box::new(|needed| assert_parse_incomplete(needed)))]
+    incomplete: Box<dyn Fn(nom::Needed) -> ()>,
+
+    #[builder(default=Box::new(|_i, _rest| ()))]
+    rest: Box<dyn Fn(&Input, Span<'static>) -> ()>,
 }
 
-#[macro_export]
-macro_rules! assert_parse_failed {
-    ($input:expr, $res:expr, offset $offset:expr, at $fragment:expr) => {
-        let input_slice = $input
-            .span
-            .fragment()
-            .get($offset..$offset + $fragment.len())
-            .expect(&format!(
-                "Invalid range {}..{} to input {:#?}",
-                $offset,
-                $offset + $fragment.len(),
-                $input.as_span().fragment()
-            ));
-        assert_eq!(
-            $fragment,
-            input_slice,
-            "Expected input at range {}..{} to start with {:#?} but instead got {:#?}",
-            $offset,
-            $offset + $fragment.len(),
-            $fragment,
-            input_slice,
-        );
-        ::claim::assert_err!(&$res);
-        let err = $res.unwrap_err();
-        ::claim::assert_matches!(err, ::nom::Err::Error(_) | ::nom::Err::Failure(_));
-        match err {
-            ::nom::Err::Error(err) | ::nom::Err::Failure(err) =>
-            {
-                assert_eq!($input.slice($offset..$offset + $fragment.len()), err.0);
+impl<Parser, O> AssertParse<Parser, O>
+where
+    Parser: Fn(Span<'static>) -> IResult<Span<'static>, O, (Span<'static>, ErrorKind)>,
+{
+    pub fn new(parser: Parser) -> AssertParseBuilder<((Parser,), (), (), (), (), ()), Parser, O> {
+        Self::builder().parser(parser)
+    }
+
+    pub fn assert(&self, input: &'static str) {
+        let input = Input::new(input);
+        let res = (self.parser)(input.span);
+        match res {
+            Ok((rest, output)) => {
+                (self.ok)(&input, output);
+                (self.rest)(&input, rest);
+                if self.all_consuming {
+                    assert_eq!(input.eof(), rest);
+                }
+            }
+            Err(err) => match err {
+                nom::Err::Incomplete(needed) => (self.incomplete)(needed),
+                nom::Err::Error(err) => panic!(
+                    "Unexpected nom::Err::Error, expected Incomplete or Failure.\n{:#?}",
+                    err
+                ),
+                nom::Err::Failure(err) => (self.err)(err),
             },
-            ::nom::Err::Incomplete(_) => {
-                unreachable!();
-            }
         }
-    };
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_assert_destructure() {
-        let res: Result<_, ()> = Ok(5);
-        assert_destructure! {
-            let Ok(x) = res;
-            {
-                assert_gt!(x, 3);
-            }
-        };
     }
 }

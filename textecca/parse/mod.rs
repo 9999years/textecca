@@ -7,7 +7,6 @@ use nom_locate::LocatedSpan;
 mod arena;
 mod cmd;
 mod default_parser;
-mod lex;
 mod parse_util;
 mod ucd_tables;
 
@@ -18,7 +17,6 @@ mod test_util;
 pub use arena::*;
 pub use cmd::*;
 pub use default_parser::*;
-pub use lex::*;
 
 /// A region of input.
 ///

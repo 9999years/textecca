@@ -20,15 +20,19 @@ use super::Span;
 /// A parsed command, consisting of a name and arguments.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Command<'i> {
+    /// The command's name.
     pub name: Span<'i>,
+    /// The command's arguments.
     pub args: Vec<Argument<'i>>,
 }
 
 impl<'i> Command<'i> {
+    /// Create a new `Command` from the given name, with no arguments.
     pub fn from_name(name: Span<'i>) -> Self {
         Self::new(name, Vec::new())
     }
 
+    /// Create a new `Command`.
     pub fn new(name: Span<'i>, args: Vec<Argument<'i>>) -> Self {
         Self { name, args }
     }
@@ -37,7 +41,9 @@ impl<'i> Command<'i> {
 /// An argument to a command.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Argument<'i> {
+    /// The argument's keyword name, if given.
     pub name: Option<Span<'i>>,
+    /// The argument's value.
     pub value: Span<'i>,
 }
 
@@ -117,7 +123,10 @@ pub fn parse_command<'a, E: ParseError<Span<'a>>>(
 
 #[cfg(test)]
 mod test {
-    use nom::error::{make_error, ErrorKind, VerboseError, VerboseErrorKind};
+    use nom::{
+        combinator::all_consuming,
+        error::{make_error, ErrorKind, VerboseError, VerboseErrorKind},
+    };
 
     use claim::*;
     use indoc::indoc;
@@ -125,122 +134,118 @@ mod test {
 
     use super::*;
 
-    use super::super::test_util::Input;
-    use crate::{assert_destructure, assert_parse_failed, assert_parsed_all, test_parse};
+    use super::super::test_util::{AssertParse, Input};
 
     #[test]
     fn test_balanced_braces() {
-        macro_rules! assert_braces_balanced {
-            ($input:expr) => {
-                let (input, res) = test_parse!(balanced_braces, $input);
-                assert_parsed_all!(input, res);
-            };
-        }
+        let builder = AssertParse::new(balanced_braces).all_consuming(true);
 
-        assert_braces_balanced!("xxx");
-        assert_braces_balanced!("{}");
-        assert_braces_balanced!("{{{}}}");
-        assert_braces_balanced!("{{{}}{}}{\\}}");
-        assert_braces_balanced!("{o{{foo}}}barbaz {}");
-        assert_braces_balanced!("{ \\{ }");
+        let balanced = builder.build();
 
-        let (input, res) = test_parse!(balanced_braces, " {} }");
-        assert_eq!(
-            Ok((
-                input.offset(4, "}"),    // remaining
-                input.offset(0, " {} "), // parsed
-            )),
-            res
-        );
+        balanced.assert("xxx");
+        balanced.assert("{}");
+        balanced.assert("{{{}}}");
+        balanced.assert("{{{}}{}}{\\}}");
+        balanced.assert("{o{{foo}}}barbaz {}");
+        balanced.assert("{ \\{ }");
 
-        let (input, res) = test_parse!(balanced_braces, "}");
-        assert_eq!(
-            Ok((
-                input.offset(0, "}"), // remaining
-                input.offset(0, ""),  // parsed
-            )),
-            res
-        );
+        AssertParse::new(balanced_braces)
+            .ok(Box::new(|input, output| {
+                assert_eq!(input.offset(0, " {} "), output)
+            }))
+            .rest(Box::new(|input, rest| {
+                assert_eq!(input.offset(4, "}"), rest)
+            }))
+            .build()
+            .assert(" {} }");
+
+        AssertParse::new(balanced_braces)
+            .ok(Box::new(|input, output| {
+                assert_eq!(input.offset(0, ""), output)
+            }))
+            .rest(Box::new(|input, rest| {
+                assert_eq!(input.offset(0, "}"), rest)
+            }))
+            .build()
+            .assert("}");
     }
 
     #[test]
     fn test_command_name() {
-        let (input, res) = test_parse!(command_name, "\\x {y}");
-        assert_destructure! {
-            let Ok((rest, name)) = res;
-            {
-                assert_eq!(input.offset(1, "x"), name);
-                assert_eq!(input.offset(2, " {y}"), rest);
-            }
-        };
+        AssertParse::new(command_name)
+            .ok(Box::new(|i, name| assert_eq!(i.offset(1, "x"), name)))
+            .rest(Box::new(|i, rest| assert_eq!(i.offset(2, " {y}"), rest)))
+            .build()
+            .assert("\\x {y}");
     }
 
     #[test]
     fn test_command_arg() {
-        let (input, res) = test_parse!(command_arg, " {y}{z}");
-        assert_destructure! {
-            let Ok((rest, arg)) = res;
-            {
-                assert_eq!(Argument::from_value(input.offset(2, "y")), arg);
-                assert_eq!(input.offset(4, "{z}"), rest);
-            }
-        };
+        let assert = || AssertParse::new(command_arg);
 
-        let (input, res) = test_parse!(command_arg, "{name = val}");
-        assert_destructure! {
-            let Ok((rest, arg)) = res;
-            {
+        assert()
+            .ok(Box::new(|input, arg| {
+                assert_eq!(Argument::from_value(input.offset(2, "y")), arg)
+            }))
+            .rest(Box::new(|input, rest| {
+                assert_eq!(input.offset(4, "{z}"), rest)
+            }))
+            .build()
+            .assert(" {y}{z}");
+
+        assert()
+            .ok(Box::new(|input, arg| {
                 assert_eq!(
-                    Argument::new(
-                        Some(input.offset(1, "name ")),
-                        input.offset(7, " val")
-                    ),
+                    Argument::new(Some(input.offset(1, "name ")), input.offset(7, " val")),
                     arg
-                );
-                assert_eq!(input.eof(), rest);
-            }
-        };
+                )
+            }))
+            .all_consuming(true)
+            .build()
+            .assert("{name = val}");
 
-        let (_input, res) = test_parse!(command_arg, "");
-        assert_err!(res);
+        assert()
+            .incomplete(Box::new(|_needed| ()))
+            .ok(Box::new(|_, _| panic!("Unexpected Ok")))
+            .build()
+            .assert("");
     }
 
     #[test]
     fn test_command() {
         // "At least 0 args" will absorb the 1 arg.
-        let (input, res) = test_parse!(parse_command(0), "\\x {y}");
-        assert_parsed_all!(input, res);
-        assert_destructure! {
-            let Ok((_, cmd)) = res;
-            {
+        AssertParse::new(parse_command(0))
+            .ok(Box::new(|i, cmd| {
                 assert_eq!(
                     Command {
-                        name: input.offset(1, "x"),
-                        args: vec![Argument::from_value(input.offset(4, "y")),],
+                        name: i.offset(1, "x"),
+                        args: vec![Argument::from_value(i.offset(4, "y")),],
                     },
                     cmd
-                );
-            }
-        }
+                )
+            }))
+            .build()
+            .assert("\\x {y}");
 
         // Here we have 1 arg.
-        let (input, res) = test_parse!(parse_command(1), "\\section{Whatever}");
-        assert_parsed_all!(input, res);
-        assert_destructure! {
-            let Ok((_, cmd)) = res;
-            {
+        AssertParse::new(parse_command(1))
+            .ok(Box::new(|i, cmd| {
                 assert_eq!(
                     Command {
-                        name: input.offset(1, "section"),
-                        args: vec![Argument::from_value(input.offset(9, "Whatever")),],
+                        name: i.offset(1, "section"),
+                        args: vec![Argument::from_value(i.offset(9, "Whatever")),],
                     },
                     cmd
-                );
-            }
-        }
+                )
+            }))
+            .build()
+            .assert("\\section{Whatever}");
 
         // We don't have 3 arguments
-        let (_input, res) = test_parse!(parse_command(3), "\\section{Whatever}");
-        assert_err!(res);
+        AssertParse::new(parse_command(3))
+            .ok(Box::new(|_, _| panic!("Unexpected Ok")))
+            .err(Box::new(|(_rest, _kind)| ()))
+            .build()
+            .assert("\\section{Whatever}");
     }
 }
