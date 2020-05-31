@@ -14,26 +14,52 @@ pub struct TaggedBlocks {
 /// A table.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Table {
-    columns: Vec<TableColumn>,
-    cells: Vec<Vec<TableCell>>,
+    /// The table's column specifications; this field holds no data, but
+    /// determines the table's display.
+    pub columns: Vec<TableColumn>,
+
+    /// The table's data. Note that due to row- and column-spans, some rows may not have `columns.len()` items.
+    pub cells: TableRows,
 }
+
+/// A list of table rows, from top to bottom.
+/// Each element in a `TableRows` lists a row's cells from left to right.
+pub type TableRows = Vec<Vec<TableCell>>;
 
 /// A cell in a `Table`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TableCell {
-    alignment: Option<Alignment>,
-    row_span: i64,
-    col_span: i64,
-    content: Blocks,
+    /// The cell's alignment.
+    pub alignment: Option<Alignment>,
+    /// The cell's row-span, the number of rows (vertically) the cell encompasses.
+    ///
+    /// A row-span of 1 indicates this is a normal cell. Row-spans should not be 0.
+    pub row_span: u32,
+    /// The cell's column-span.
+    pub col_span: u32,
+    /// The cell's contents.
+    pub content: Blocks,
+}
+
+impl Default for TableCell {
+    fn default() -> Self {
+        Self {
+            alignment: None,
+            row_span: 1,
+            col_span: 1,
+            content: Vec::new(),
+        }
+    }
 }
 
 /// A column-specification in a `Table`; note that this does *not* include the
 /// column's *contents.*
 #[derive(Debug, Clone, PartialEq)]
 pub struct TableColumn {
-    alignment: Alignment,
+    /// The column's alignment.
+    pub alignment: Alignment,
     /// Relative width.
-    width: f64,
+    pub width: f64,
 }
 
 /// A `Table` column's alignment.

@@ -43,7 +43,7 @@ pub enum Block {
     Par(Inlines),
 
     /// Code block.
-    Code(Inlines),
+    Code(Code),
 
     /// Block quote.
     Quote(Blocks),
