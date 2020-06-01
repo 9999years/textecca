@@ -19,7 +19,13 @@ pub enum SerializerError {
 
     /// Some other arbitrary error.
     #[error("{0}")]
-    Other(Box<dyn error::Error>),
+    Other(#[from] Box<dyn error::Error>),
+}
+
+impl<E: error::Error + 'static> From<Box<E>> for SerializerError {
+    fn from(e: Box<E>) -> Self {
+        Self::Other(e)
+    }
 }
 
 /// Trait to initialize a `Serializer`.

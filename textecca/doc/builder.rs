@@ -24,9 +24,22 @@ impl TryInto<Doc> for DocBuilder {
     }
 }
 
+impl TryInto<Blocks> for DocBuilder {
+    type Error = DocBuilderError;
+    fn try_into(self) -> Result<Blocks, Self::Error> {
+        let doc: Doc = self.try_into()?;
+        Ok(doc.content)
+    }
+}
+
 impl DocBuilder {
     /// Create a new builder.
     pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Create a new builder inheriting from the given parent.
+    pub fn new_inheriting(parent: &Self) -> Self {
         Default::default()
     }
 
@@ -52,7 +65,6 @@ impl DocBuilder {
         match list.items.last_mut() {
             None => {
                 list.items.push(ListItem {
-                    label: None,
                     content: vec![Self::to_block(current)],
                 });
                 Ok(())

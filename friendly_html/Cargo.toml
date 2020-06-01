@@ -1,0 +1,31 @@
+[package]
+name = "friendly_html"
+version = "0.0.1"
+authors = ["Rebecca Turner <rbt@sent.as>"]
+edition = "2018"
+description = ""
+# documentaton = ""
+readme = "README.md"
+repository = "https://github.com/9999years/textecca"
+license = "AGPL-3.0"
+keywords = ["markup", "typesetting", "programming-language"]
+categories = [
+]
+# build = ""
+# exclude = []
+# include = []
+
+# [badges]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "friendly_html"
+path = "lib.rs"
+
+[dependencies]
+html5ever = "0.25.0"  # HTML parsing/serialization.
+
+[dev-dependencies]
+pretty_assertions = "0.6.1"  # Better assert_eq! and assert_ne! macros.
+indoc = "0.3.5" # Indented multiline strings.

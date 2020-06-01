@@ -133,26 +133,21 @@ pub enum ListKind {
     ///
     /// [ol]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/ol
     Ordered,
-    /// A description/definition list, used for defining specific terms.
-    ///
-    /// In HTML, this corresponds to the [`<dl>`][dl] element, and in LaTeX this
-    /// corresponds to the `description` environment.
-    ///
-    /// [dl]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dl
-    Description,
 }
 
 /// An item in a `List`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListItem {
-    /// This item's label; if empty, the `Serializer` may substitute any value it
-    /// sees fit.
-    pub label: Option<Inlines>,
     /// This item's content.
     pub content: Blocks,
 }
 
-/// A list, ordered, unordered, or of defined terms.
+/// A list of defined terms.
+///
+/// In HTML, this corresponds to the [`<dl>`][dl] element, and in LaTeX this
+/// corresponds to the `description` environment.
+///
+/// [dl]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dl
 #[derive(Debug, Clone, PartialEq)]
 pub struct TermListItem {
     /// This item's label.

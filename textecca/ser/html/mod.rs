@@ -1,72 +1,189 @@
 use std::io::{self, Write};
 use std::iter;
-use std::vec;
+use std::mem;
+use std::{borrow::Cow, vec};
 
-// html5ever renames to avoid conflicts.
-mod h5 {
-    pub use html5ever::{interface::QualName, serialize::*, LocalName};
-}
+use thiserror::Error;
 
-use h5::Serializer as _;
-use html5ever::{local_name, namespace_url, ns};
-
-use tera::Tera;
+use friendly_html as fh;
 
 use super::{InitSerializer, Serializer, SerializerError};
-use crate::doc::{Block, Doc, Inline, Inlines};
+use crate::doc::{Block, Blocks, Doc, Footnote, Heading, Inline, Inlines, List, ListKind};
 
 mod slugify;
 pub use slugify::*;
 
-#[allow(unused_macros)]
-macro_rules! html_name {
-    ($el_name:tt) => {
-        h5::QualName::new(None, ns!(html), local_name!($el_name))
-    };
-}
-
 /// Serializer to HTML5.
 pub struct HtmlSerializer<W: Write> {
-    ser: h5::HtmlSerializer<W>,
-    seen_paragraph: bool,
-    tera: Tera,
+    ser: fh::HtmlSerializer<W>,
+    footnotes: Vec<MarkedFootnote>,
+}
+
+struct MarkedFootnote {
+    id: String,
+    return_id: String,
+    content: Blocks,
 }
 
 impl<W: Write> InitSerializer<W> for HtmlSerializer<W> {
     fn new(writer: W) -> Result<Box<Self>, SerializerError> {
         Ok(Box::new(Self {
-            seen_paragraph: false,
-            ser: h5::HtmlSerializer::new(
-                writer,
-                h5::SerializeOpts {
-                    create_missing_parent: false,
-                    scripting_enabled: false,
-                    traversal_scope: h5::TraversalScope::ChildrenOnly(None),
-                },
-            ),
-            // TODO: Don't hardcode templates directory.
-            tera: Tera::new("templates/*").map_err(|e| SerializerError::Other(Box::new(e)))?,
+            ser: fh::HtmlSerializer::with_doctype(writer)?,
+            footnotes: Default::default(),
         }))
     }
 }
 
 impl<W: Write> HtmlSerializer<W> {
-    fn write_inlines(&mut self, inlines: Inlines) -> Result<(), SerializerError> {
-        for inline in inlines {
-            match inline {
-                Inline::Text(text) => {
-                    self.ser.write_text(&text)?;
-                }
-                Inline::Styled { .. } => todo!(),
-                Inline::Quote(_) => todo!(),
-                Inline::Code(_) => todo!(),
-                Inline::Space => {
-                    self.ser.write_text(" ")?;
-                }
-                Inline::Link(_) => todo!(),
-                Inline::Footnote(_) => todo!(),
-                Inline::Math(_) => todo!(),
+    fn write_footnote(&mut self, footnote: Footnote) -> Result<(), SerializerError> {
+        let num = self.footnotes.len() + 1;
+        let id = format!("fn-{}", num);
+        let return_id = format!("fn-link-{}", num);
+        self.ser.elem("sup")?;
+        self.ser
+            .elem_attrs("a", &[("href", &format!("#{}", &id)), ("id", &return_id)])?;
+        self.ser.write_text(format!("[{}]", num))?;
+        self.ser.end_elem()?;
+        self.ser.end_elem()?;
+        self.footnotes.push(MarkedFootnote {
+            id,
+            return_id,
+            content: footnote.content,
+        });
+        Ok(())
+    }
+
+    fn finish_footnote(&mut self, footnote: MarkedFootnote) -> Result<(), SerializerError> {
+        // TODO: Write self-link.
+        self.write_blocks(footnote.content)?;
+        self.ser.write_text(" ")?;
+        self.ser
+            .elem_attrs("a", &[("href", format!("#{}", footnote.return_id))])?;
+        self.ser.write_text("↩")?;
+        self.ser.end_elem()?;
+        Ok(())
+    }
+
+    fn finish_footnotes(&mut self) -> Result<(), SerializerError> {
+        if self.footnotes.is_empty() {
+            return Ok(());
+        }
+
+        self.ser.elem_attrs("ol", &[("class", "footnotes")])?;
+        for footnote in mem::take(&mut self.footnotes) {
+            self.ser.elem_attrs("li", &[("id", &footnote.id)])?;
+            self.finish_footnote(footnote)?;
+            self.ser.end_elem()?;
+        }
+        self.ser.end_elem()?;
+        Ok(())
+    }
+
+    fn write_inline(&mut self, inline: Cow<Inline>) -> Result<(), SerializerError> {
+        match inline.as_ref() {
+            Inline::Text(content) => {
+                self.ser.write_text(content)?;
             }
+            Inline::Styled { .. } => todo!(),
+            Inline::Quote(quote) => {
+                let (l, r) = quote.kind.to_inlines();
+                self.write_inlines(&l)?;
+                self.write_inlines(&quote.content)?;
+                self.write_inlines(&r)?;
+            }
+            Inline::Code(code) => {
+                if let Some(lang) = &code.language {
+                    self.ser.elem_attrs("code", &[("class", &lang)])?;
+                } else {
+                    self.ser.elem("code")?;
+                }
+                self.ser.write_text(&code.content)?;
+                self.ser.end_elem()?;
+            }
+            Inline::Space => {
+                self.ser.write_text(" ")?;
+            }
+            Inline::Link(_) => {}
+            Inline::Footnote(_) => match inline.into_owned() {
+                Inline::Footnote(footnote) => self.write_footnote(footnote)?,
+                _ => unreachable!(),
+            },
+            Inline::Math(_) => todo!(),
+        }
+        Ok(())
+    }
+
+    fn write_inlines(&mut self, inlines: &[Inline]) -> Result<(), SerializerError> {
+        for inline in inlines {
+            self.write_inline(Cow::Borrowed(inline))?;
+        }
+        Ok(())
+    }
+
+    fn write_list(&mut self, list: List) -> Result<(), SerializerError> {
+        let list_tag = match list.kind {
+            ListKind::Unordered => "ul",
+            ListKind::Ordered => "ol",
+        };
+        self.ser.elem(list_tag)?;
+        for item in list.items {
+            self.ser.elem("li")?;
+            self.write_blocks(item.content)?;
+            self.ser.end_elem()?;
+        }
+        self.ser.end_elem()?;
+        Ok(())
+    }
+
+    fn write_block(&mut self, block: Block) -> Result<(), SerializerError> {
+        match block {
+            Block::Plain(inlines) => {
+                self.write_inlines(&inlines)?;
+            }
+            Block::Par(inlines) => {
+                self.ser.write_text("\n")?;
+                self.ser.elem("p")?;
+                self.write_inlines(&inlines)?;
+                self.ser.end_elem()?;
+            }
+            Block::Code(_) => todo!(),
+            Block::Quote(quote) => {
+                self.ser.elem("blockquote")?;
+                self.write_blocks(quote)?;
+                self.ser.end_elem()?;
+            }
+            Block::List(list) => self.write_list(list)?,
+            Block::Heading(heading) => {
+                if !(1..6).contains(&heading.level) {
+                    return Err(HtmlError::from(heading).into());
+                }
+                let tag_name = format!("h{}", heading.level);
+                let slug = slugify(&heading.text);
+                self.ser.elem_attrs(&tag_name, &[("id", &slug)])?;
+
+                self.ser
+                    .elem_attrs("a", &[("href", format!("#{}", &slug))])?;
+                self.ser.end_elem()?;
+
+                self.write_inlines(&heading.text)?;
+
+                self.ser.end_elem()?;
+            }
+            Block::Rule => {
+                self.ser.elem("hr")?;
+            }
+            Block::Table(_) => todo!(),
+            Block::Figure(_) => todo!(),
+            Block::Defn(_) => todo!(),
+            Block::Tagged(_) => todo!(),
+            Block::TermList(_) => todo!(),
+        }
+        Ok(())
+    }
+
+    fn write_blocks(&mut self, blocks: Blocks) -> Result<(), SerializerError> {
+        for block in blocks {
+            self.write_block(block)?;
         }
         Ok(())
     }
@@ -74,67 +191,29 @@ impl<W: Write> HtmlSerializer<W> {
 
 impl<W: Write> Serializer for HtmlSerializer<W> {
     fn write_doc(&mut self, doc: Doc) -> Result<(), SerializerError> {
-        self.ser.write_doctype("html")?;
+        self.write_blocks(doc.content)?;
+        self.finish_footnotes()?;
         self.ser.write_text("\n")?;
-
-        let mut base_ctx = tera::Context::new();
-        for (k, v) in doc.meta {
-            base_ctx.insert(k, &v);
-        }
-
-        for block in doc.content {
-            match block {
-                Block::Plain(inlines) => {
-                    self.write_inlines(inlines)?;
-                }
-                Block::Par(inlines) => {
-                    if self.seen_paragraph {
-                        self.ser.end_elem(html_name!("p"))?;
-                    }
-                    self.ser.write_text("\n")?;
-                    self.ser.start_elem(html_name!("p"), iter::empty())?;
-                    self.write_inlines(inlines)?;
-                }
-                Block::Code(_) => todo!(),
-                Block::Quote(_) => todo!(),
-                Block::List(_) => todo!(),
-                Block::Heading(heading) => {
-                    let tag_name = match heading.level {
-                        1 => html_name!("h1"),
-                        2 => html_name!("h2"),
-                        3 => html_name!("h3"),
-                        4 => html_name!("h4"),
-                        5 => html_name!("h5"),
-                        6 => html_name!("h6"),
-                        _ => {
-                            panic!("Bad heading level!");
-                        }
-                    };
-                    self.ser.start_elem(tag_name.clone(), iter::empty())?;
-
-                    // Write the URL slug.
-                    let slug = slugify(&heading.text);
-                    let hash_slug = format!("#{}", slug);
-                    let attr_href = h5::QualName::new(None, ns!(), h5::LocalName::from("href"));
-                    let attr_id = h5::QualName::new(None, ns!(), h5::LocalName::from("id"));
-                    let attrs = vec![(&attr_href, hash_slug.as_str()), (&attr_id, slug.as_str())];
-                    self.ser.start_elem(html_name!("a"), attrs.into_iter())?;
-                    self.ser.end_elem(html_name!("a"))?;
-
-                    self.write_inlines(heading.text)?;
-                    self.ser.end_elem(tag_name)?;
-                }
-                Block::Rule => {
-                    self.ser.start_elem(html_name!("hr"), iter::empty())?;
-                }
-                Block::Table(_) => todo!(),
-                Block::Figure(_) => todo!(),
-                Block::Defn(_) => todo!(),
-                Block::Tagged(_) => todo!(),
-                Block::TermList(_) => todo!(),
-            }
-        }
-
         Ok(())
+    }
+}
+
+/// An error when serializing HTML.
+#[derive(Debug, Error)]
+pub enum HtmlError {
+    /// A bad document heading, in particular an unsupported level.
+    #[error("Bad heading: {0:?}")]
+    BadHeading(Heading),
+}
+
+impl From<Heading> for HtmlError {
+    fn from(h: Heading) -> Self {
+        Self::BadHeading(h)
+    }
+}
+
+impl Into<SerializerError> for HtmlError {
+    fn into(self) -> SerializerError {
+        SerializerError::Other(Box::new(self))
     }
 }

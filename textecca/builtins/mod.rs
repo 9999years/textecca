@@ -2,14 +2,16 @@
 
 use crate::{
     cmd::{Command, CommandError, CommandInfo, FromArgs, FromArgsError, ParsedArgs, Thunk, World},
-    doc::{Block, Blocks, DocBuilder, DocBuilderPush as _, Heading},
+    doc::{self, Block, Blocks, DocBuilder, DocBuilderPush as _, Heading, Inline},
     env::Environment,
 };
+use std::convert::TryInto;
 
 /// Adds the builtins bindings to the given `Environment`.
 pub fn import(env: &mut Environment) {
     env.add_binding::<Par>();
     env.add_binding::<Sec>();
+    env.add_binding::<Footnote>();
 }
 
 macro_rules! cmd_info {
@@ -91,6 +93,45 @@ impl<'i> Command<'i> for Sec<'i> {
             text: Default::default(),
         }))?;
         self.title.force(world, doc)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct Footnote<'i> {
+    content: Thunk<'i>,
+}
+impl<'i> Footnote<'i> {
+    fn from_args<'a>(
+        parsed: &mut ParsedArgs<'a>,
+    ) -> Result<Box<dyn Command<'a> + 'a>, FromArgsError> {
+        let content = parsed.pop_positional()?;
+        parsed.check_no_args()?;
+        Ok(Box::new(Footnote { content }))
+    }
+}
+
+impl<'i> CommandInfo for Footnote<'i> {
+    fn name() -> String {
+        "footnote".into()
+    }
+
+    fn from_args_fn() -> FromArgs {
+        Self::from_args
+    }
+}
+
+impl<'i> Command<'i> for Footnote<'i> {
+    fn call(
+        self: Box<Self>,
+        doc: &mut DocBuilder,
+        world: &World<'i>,
+    ) -> Result<(), CommandError<'i>> {
+        let mut blocks = DocBuilder::new_inheriting(doc);
+        self.content.force(world, &mut blocks)?;
+        doc.push(Inline::Footnote(doc::Footnote {
+            content: blocks.try_into()?,
+        }))?;
         Ok(())
     }
 }

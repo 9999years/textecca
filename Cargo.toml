@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "textecca",
-    "bin"
+    "bin",
+    "friendly_html",
 ]

@@ -82,6 +82,23 @@ pub enum QuoteKind {
     Other(Box<Inlines>, Box<Inlines>),
 }
 
+impl QuoteKind {
+    /// Gives a pair of the open and close quote markers as `Inlines`.
+    pub fn to_inlines(&self) -> (Cow<[Inline]>, Cow<[Inline]>) {
+        match self {
+            QuoteKind::Primary => (
+                Cow::Owned(vec![Inline::Text("“".into())]),
+                Cow::Owned(vec![Inline::Text("”".into())]),
+            ),
+            QuoteKind::Secondary => (
+                Cow::Owned(vec![Inline::Text("‘".into())]),
+                Cow::Owned(vec![Inline::Text("’".into())]),
+            ),
+            QuoteKind::Other(l, r) => (Cow::Borrowed(&l), Cow::Borrowed(&r)),
+        }
+    }
+}
+
 /// Styled text.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Style {
