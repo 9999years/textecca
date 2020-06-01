@@ -1,11 +1,14 @@
 use super::Length;
-use super::{Inlines, Meta};
+use super::{Blocks, Inline, Inlines, Meta};
+use std::borrow::Cow;
 
 /// A group of inlines tagged with some metadata.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TaggedInlines {
-    content: Inlines,
-    meta: Meta,
+    /// The contained text.
+    pub content: Inlines,
+    /// The tagged metadata.
+    pub meta: Meta,
 }
 
 /// A link, either to something within this document or to an external URL.
@@ -13,11 +16,24 @@ pub struct TaggedInlines {
 pub struct Link {
     /// The link text, if any; if no text is given, the serializer may compute
     /// its own representation. This is likely appropriate for intra-document links.
-    text: Option<Inlines>,
+    pub content: Option<Inlines>,
     /// The link's label, if any. This may be used for accessibility purposes.
-    label: Option<String>,
+    pub label: Option<String>,
     /// The link's target.
-    target: LinkTarget,
+    pub target: LinkTarget,
+}
+
+impl Link {
+    /// Get the link's text, from `text`, `label`, or `target` (in that order).
+    pub fn text(&self) -> Cow<[Inline]> {
+        if let Some(inlines) = &self.content {
+            Cow::Borrowed(inlines)
+        } else if let Some(text) = &self.label {
+            Cow::Owned(vec![Inline::Text(text.into())])
+        } else {
+            Cow::Owned(vec![Inline::Text(self.target.as_str().into())])
+        }
+    }
 }
 
 /// A `Link`'s destination, either within the document or external.
@@ -30,12 +46,24 @@ pub enum LinkTarget {
     URL(String),
 }
 
+impl LinkTarget {
+    /// Get the target of this link as a string slice.
+    pub fn as_str(&self) -> &str {
+        match self {
+            LinkTarget::Label(s) | LinkTarget::URL(s) => &s,
+        }
+    }
+}
+
 // TODO: Support for citations?
 
 /// An inline quotation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Quote {
-    kind: QuoteKind,
+    /// The quotation markers.
+    pub kind: QuoteKind,
+    /// The quotation text.
+    pub content: Inlines,
 }
 
 /// Quotation markers; see [Wikipedia](https://en.wikipedia.org/wiki/Quotation_mark).
@@ -44,7 +72,6 @@ pub enum QuoteKind {
     /// Primary quotes, locale-defined.
     ///
     /// In US English, these are `“…”`.
-    ///
     Primary,
     /// Secondary quotes, locale-defined.
     ///
@@ -93,3 +120,26 @@ pub struct Font {}
 /// Text with particular font features activated.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FontFeatures {}
+
+/// An inline code snippet.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InlineCode {
+    /// The code's language, for highlighting. `"plain"` indicates no highlighting.
+    pub language: Option<String>,
+    /// The code.
+    pub content: String,
+}
+
+/// A footnote.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Footnote {
+    /// The footnote text.
+    pub content: Blocks,
+}
+
+/// Inline mathematical text.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InlineMath {
+    /// The math to render, as `LaTeX`.
+    pub tex: String,
+}

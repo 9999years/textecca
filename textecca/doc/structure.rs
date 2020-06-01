@@ -83,13 +83,18 @@ pub enum Inline {
     Text(String),
 
     /// Style instruction.
-    Styled(Style),
+    Styled {
+        /// The style the text is tagged with.
+        style: Style,
+        /// The contained text.
+        content: Inlines,
+    },
 
     /// An inline quotation.
     Quote(Quote),
 
     /// Inline code span.
-    Code(String),
+    Code(InlineCode),
 
     /// Inter-word space.
     ///
@@ -102,8 +107,8 @@ pub enum Inline {
     /// A footnote.
     ///
     /// TODO: Endnotes, footnote positioning, end-of-chapter notes...?
-    Footnote(String),
+    Footnote(Footnote),
 
     /// Mathematics.
-    Math(String),
+    Math(InlineMath),
 }

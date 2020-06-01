@@ -1,9 +1,10 @@
 use std::io::{self, Write};
 use std::iter;
+use std::vec;
 
 // html5ever renames to avoid conflicts.
 mod h5 {
-    pub use html5ever::{interface::QualName, serialize::*};
+    pub use html5ever::{interface::QualName, serialize::*, LocalName};
 }
 
 use h5::Serializer as _;
@@ -13,6 +14,9 @@ use tera::Tera;
 
 use super::{InitSerializer, Serializer, SerializerError};
 use crate::doc::{Block, Doc, Inline, Inlines};
+
+mod slugify;
+pub use slugify::*;
 
 #[allow(unused_macros)]
 macro_rules! html_name {
@@ -53,7 +57,7 @@ impl<W: Write> HtmlSerializer<W> {
                 Inline::Text(text) => {
                     self.ser.write_text(&text)?;
                 }
-                Inline::Styled(_) => todo!(),
+                Inline::Styled { .. } => todo!(),
                 Inline::Quote(_) => todo!(),
                 Inline::Code(_) => todo!(),
                 Inline::Space => {
@@ -107,6 +111,16 @@ impl<W: Write> Serializer for HtmlSerializer<W> {
                         }
                     };
                     self.ser.start_elem(tag_name.clone(), iter::empty())?;
+
+                    // Write the URL slug.
+                    let slug = slugify(&heading.text);
+                    let hash_slug = format!("#{}", slug);
+                    let attr_href = h5::QualName::new(None, ns!(), h5::LocalName::from("href"));
+                    let attr_id = h5::QualName::new(None, ns!(), h5::LocalName::from("id"));
+                    let attrs = vec![(&attr_href, hash_slug.as_str()), (&attr_id, slug.as_str())];
+                    self.ser.start_elem(html_name!("a"), attrs.into_iter())?;
+                    self.ser.end_elem(html_name!("a"))?;
+
                     self.write_inlines(heading.text)?;
                     self.ser.end_elem(tag_name)?;
                 }

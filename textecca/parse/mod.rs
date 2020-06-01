@@ -7,7 +7,7 @@ use nom_locate::LocatedSpan;
 mod arena;
 mod cmd;
 mod default_parser;
-mod parse_util;
+pub(crate) mod parse_util;
 mod ucd_tables;
 
 #[macro_use]
