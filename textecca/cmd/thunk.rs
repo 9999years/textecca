@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use super::{CommandError, ParsedArgs, World};
-use crate::doc::{Block, Blocks, Inline};
+use crate::doc::{Block, Blocks, DocBuilder, DocBuilderPush, Inline};
 use crate::env::Environment;
 use crate::parse::{Source, Token, Tokens};
 
@@ -28,23 +28,25 @@ impl<'i> From<Blocks> for Thunk<'i> {
 
 impl<'i> Thunk<'i> {
     /// Evaluate this thunk if it's `Lazy`, otherwise, return its `Blocks`.
-    pub fn force(self, world: &World<'i>) -> Result<Blocks, CommandError<'i>> {
+    pub fn force(self, world: &World<'i>, doc: &mut DocBuilder) -> Result<(), CommandError<'i>> {
         match self {
             Self::Lazy(tokens) => {
-                let mut ret = Vec::with_capacity(tokens.len());
                 for tok in tokens {
                     match tok {
                         Token::Text(sp) => {
-                            ret.push(Block::Plain(vec![Inline::Text(sp.to_string())]));
+                            doc.push(sp)?;
                         }
                         Token::Command(cmd) => {
-                            ret.append(&mut world.call_cmd(cmd)?);
+                            world.call_cmd(cmd, doc)?;
                         }
                     }
                 }
-                Ok(ret)
+                Ok(())
             }
-            Self::Forced(blocks) => Ok(blocks),
+            Self::Forced(blocks) => {
+                doc.push(blocks)?;
+                Ok(())
+            }
         }
     }
 }

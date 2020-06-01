@@ -95,9 +95,20 @@ impl<W: Write> Serializer for HtmlSerializer<W> {
                 Block::Quote(_) => todo!(),
                 Block::List(_) => todo!(),
                 Block::Heading(heading) => {
-                    let mut ctx = base_ctx.clone();
-                    ctx.insert("level", &heading.level);
-                    // ctx.insert("")
+                    let tag_name = match heading.level {
+                        1 => html_name!("h1"),
+                        2 => html_name!("h2"),
+                        3 => html_name!("h3"),
+                        4 => html_name!("h4"),
+                        5 => html_name!("h5"),
+                        6 => html_name!("h6"),
+                        _ => {
+                            panic!("Bad heading level!");
+                        }
+                    };
+                    self.ser.start_elem(tag_name.clone(), iter::empty())?;
+                    self.write_inlines(heading.text)?;
+                    self.ser.end_elem(tag_name)?;
                 }
                 Block::Rule => {
                     self.ser.start_elem(html_name!("hr"), iter::empty())?;

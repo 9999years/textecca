@@ -35,7 +35,11 @@ impl<'i> CommandInfo for DefaultCommand<'i> {
 }
 
 impl<'i> Command<'i> for DefaultCommand<'i> {
-    fn call(self: Box<Self>, world: &World<'i>) -> Result<Blocks, CommandError<'i>> {
-        Ok(self.doc.force(world)?)
+    fn call(
+        self: Box<Self>,
+        doc: &mut crate::doc::DocBuilder,
+        world: &World<'i>,
+    ) -> Result<(), CommandError<'i>> {
+        self.doc.force(world, doc)
     }
 }

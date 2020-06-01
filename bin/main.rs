@@ -3,15 +3,15 @@ use std::error;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::{convert::TryInto, rc::Rc};
 
 use structopt::StructOpt;
 use thiserror::Error;
 
 use textecca::{
     builtins,
-    cmd::{CommandError, DefaultCommand, World},
-    doc::{Block, Doc, Inline},
+    cmd::{CommandError, DefaultCommand, Thunk, World},
+    doc::{Block, Doc, DocBuilder, DocBuilderError, DocBuilderPush, Inline},
     env::Environment,
     parse::{default_parser, Source, Span, Token},
     ser::{HtmlSerializer, InitSerializer as _, Serializer as _, SerializerError},
@@ -36,6 +36,9 @@ enum MainError<'i> {
     Serializer(#[from] SerializerError),
 
     #[error("{0}")]
+    Doc(#[from] DocBuilderError),
+
+    #[error("{0}")]
     Dyn(Box<dyn error::Error + 'i>),
 }
 
@@ -56,24 +59,10 @@ fn main_inner<'i>(src: &'i Source) -> Result<(), MainError<'i>> {
     builtins::import(Rc::get_mut(&mut env).unwrap());
     let world = World { env, arena: src };
     let toks = default_parser(src, src.into())?;
-    let mut blocks: Vec<Block> = Vec::new();
-    for tok in toks {
-        match tok {
-            Token::Text(span) => {
-                blocks.push(Block::Plain(vec![Inline::Text(
-                    span.fragment().to_string(),
-                )]));
-            }
-            Token::Command(cmd) => {
-                blocks.append(&mut world.call_cmd(cmd)?);
-            }
-        }
-    }
-
-    let doc = Doc::from_content(blocks);
+    let mut doc = DocBuilder::new();
+    Thunk::from(toks).force(&world, &mut doc)?;
     let mut ser = HtmlSerializer::new(io::stdout())?;
-    ser.write_doc(doc)?;
-
+    ser.write_doc(doc.try_into()?)?;
     Ok(())
 }
 

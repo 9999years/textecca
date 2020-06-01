@@ -1,4 +1,4 @@
-use std::mem;
+use std::{convert::TryInto, mem};
 
 use thiserror::Error;
 
@@ -6,14 +6,30 @@ use super::{
     Block, Blocks, Code, Defn, Doc, Figure, Heading, Inline, Inlines, List, ListItem, Table,
     TableCell, TermListItem,
 };
+use crate::parse::Span;
 
 /// A builder for `Doc` instances; `Command`s use a `DocBuilder` to add blocks to an output stream.
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct DocBuilder {
     doc: Doc,
     current: Inlines,
 }
 
+impl TryInto<Doc> for DocBuilder {
+    type Error = DocBuilderError;
+    fn try_into(self) -> Result<Doc, Self::Error> {
+        let mut self_ = self;
+        self_.drain_current()?;
+        Ok(self_.doc)
+    }
+}
+
 impl DocBuilder {
+    /// Create a new builder.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
     fn to_block(current: &mut Inlines) -> Block {
         Block::Par(mem::take(current))
     }
@@ -116,7 +132,11 @@ impl DocBuilder {
     }
 
     fn drain_current(&mut self) -> Result<(), DocBuilderError> {
-        Self::add_to_blocks(&mut self.current, &mut self.doc.content)
+        if !self.current.is_empty() {
+            Self::add_to_blocks(&mut self.current, &mut self.doc.content)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -134,9 +154,33 @@ impl DocBuilderPush<Block> for DocBuilder {
     }
 }
 
+impl DocBuilderPush<Blocks> for DocBuilder {
+    fn push(&mut self, elem: Blocks) -> Result<(), DocBuilderError> {
+        self.drain_current()?;
+        let mut elem = elem;
+        self.doc.content.append(&mut elem);
+        Ok(())
+    }
+}
+
 impl DocBuilderPush<Inline> for DocBuilder {
     fn push(&mut self, elem: Inline) -> Result<(), DocBuilderError> {
         self.current.push(elem);
+        Ok(())
+    }
+}
+
+impl DocBuilderPush<Inlines> for DocBuilder {
+    fn push(&mut self, elem: Inlines) -> Result<(), DocBuilderError> {
+        let mut elem = elem;
+        self.current.append(&mut elem);
+        Ok(())
+    }
+}
+
+impl<'i> DocBuilderPush<Span<'i>> for DocBuilder {
+    fn push(&mut self, elem: Span<'i>) -> Result<(), DocBuilderError> {
+        self.current.push(Inline::Text(elem.fragment().to_string()));
         Ok(())
     }
 }
@@ -145,6 +189,6 @@ impl DocBuilderPush<Inline> for DocBuilder {
 #[derive(Error, Debug)]
 pub enum DocBuilderError {
     /// Attempted to push inline data to an empty TermList.
-    #[error("Attempted to push inlines to empty termlist -- what would the new item's term be?")]
+    #[error("Attempted to push inlines to empty termlist")]
     EmptyTermList,
 }

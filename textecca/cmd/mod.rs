@@ -11,7 +11,7 @@ use std::rc::Rc;
 use derivative::Derivative;
 use thiserror::Error;
 
-use crate::doc::{Block, Blocks, DocBuilder};
+use crate::doc::{Block, Blocks, DocBuilder, DocBuilderError};
 use crate::env::Environment;
 use crate::parse::{self, Argument, Parser, Source, Tokens};
 
@@ -73,7 +73,11 @@ pub trait CommandInfo {
 /// `Serializer`.
 pub trait Command<'i>: std::fmt::Debug {
     /// Call (i.e. evaluate) the given `Command`.
-    fn call(self: Box<Self>, world: &World<'i>) -> Result<Blocks, CommandError<'i>>;
+    fn call(
+        self: Box<Self>,
+        doc: &mut DocBuilder,
+        world: &World<'i>,
+    ) -> Result<(), CommandError<'i>>;
 
     /// Get the environment this command's arguments are evaluated in.
     ///
@@ -108,8 +112,12 @@ impl<'i> World<'i> {
     }
 
     /// Construct and call the given `Command`.
-    pub fn call_cmd(&self, cmd: parse::Command<'i>) -> Result<Blocks, CommandError<'i>> {
-        self.get_cmd(cmd)?.call(self)
+    pub fn call_cmd(
+        &self,
+        cmd: parse::Command<'i>,
+        doc: &mut DocBuilder,
+    ) -> Result<(), CommandError<'i>> {
+        self.get_cmd(cmd)?.call(doc, self)
     }
 }
 
@@ -131,4 +139,8 @@ pub enum CommandError<'i> {
     /// An error while parsing the `Command`'s arguments.
     #[error("Parse error: {0}")]
     ParseError(Box<dyn error::Error + 'i>),
+
+    /// Error while creating the output document.
+    #[error("{0}")]
+    DocBuilder(#[from] DocBuilderError),
 }

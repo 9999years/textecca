@@ -2,7 +2,7 @@
 
 use crate::{
     cmd::{Command, CommandError, CommandInfo, FromArgs, FromArgsError, ParsedArgs, Thunk, World},
-    doc::{Block, Blocks, Heading},
+    doc::{Block, Blocks, DocBuilder, DocBuilderPush as _, Heading},
     env::Environment,
 };
 
@@ -46,8 +46,13 @@ cmd_info! {
 }
 
 impl<'i> Command<'i> for Par {
-    fn call(self: Box<Self>, _world: &World<'i>) -> Result<Blocks, CommandError<'i>> {
-        Ok(vec![Block::Par(vec![])])
+    fn call(
+        self: Box<Self>,
+        doc: &mut DocBuilder,
+        _world: &World<'i>,
+    ) -> Result<(), CommandError<'i>> {
+        doc.push(Block::Par(Default::default()))?;
+        Ok(())
     }
 }
 
@@ -76,24 +81,16 @@ impl<'i> CommandInfo for Sec<'i> {
 }
 
 impl<'i> Command<'i> for Sec<'i> {
-    fn call(self: Box<Self>, world: &World<'i>) -> Result<Blocks, CommandError<'i>> {
-        let mut title = self.title.force(world)?;
-        if title.len() != 1 {
-            return Err(CommandError::Type(
-                "sec argument cannot render to multiple blocks".into(),
-            ));
-        }
-        let text = match title.pop().unwrap() {
-            Block::Plain(inlines) => inlines,
-            _ => {
-                return Err(CommandError::Type(
-                    "sec argument cannot contain paragraphs or other block-level structures".into(),
-                ))
-            }
-        };
-        Ok(vec![Block::Heading(Heading {
+    fn call(
+        self: Box<Self>,
+        doc: &mut DocBuilder,
+        world: &World<'i>,
+    ) -> Result<(), CommandError<'i>> {
+        doc.push(Block::Heading(Heading {
             level: 1,
-            text: text,
-        })])
+            text: Default::default(),
+        }))?;
+        self.title.force(world, doc)?;
+        Ok(())
     }
 }
