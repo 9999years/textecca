@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{convert::TryInto, rc::Rc};
 
 use super::{CommandError, ParsedArgs, World};
 use crate::doc::{Block, Blocks, DocBuilder, DocBuilderPush, Inline};
@@ -27,7 +27,7 @@ impl<'i> From<Blocks> for Thunk<'i> {
 }
 
 impl<'i> Thunk<'i> {
-    /// Evaluate this thunk if it's `Lazy`, otherwise, return its `Blocks`.
+    /// Evaluate this thunk if it's `Lazy`, otherwise, write its `Blocks` to the given `DocBuilder`.
     pub fn force(self, world: &World<'i>, doc: &mut DocBuilder) -> Result<(), CommandError<'i>> {
         match self {
             Self::Lazy(tokens) => {
@@ -48,5 +48,13 @@ impl<'i> Thunk<'i> {
                 Ok(())
             }
         }
+    }
+
+    /// Evaluate the given `Thunk` and return its blocks directly; avoids
+    /// manually creating a temporary `DocBuilder`.
+    pub fn into_blocks(self, world: &World<'i>) -> Result<Blocks, CommandError<'i>> {
+        let mut doc = DocBuilder::new();
+        self.force(world, &mut doc)?;
+        Ok(doc.try_into()?)
     }
 }

@@ -4,7 +4,6 @@
 
 //! Textecca is a markup language framework.
 
-pub mod builtins;
 pub mod cmd;
 pub mod doc;
 pub mod env;

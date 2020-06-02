@@ -9,13 +9,13 @@ use structopt::StructOpt;
 use thiserror::Error;
 
 use textecca::{
-    builtins,
     cmd::{CommandError, DefaultCommand, Thunk, World},
     doc::{Block, Doc, DocBuilder, DocBuilderError, DocBuilderPush, Inline},
     env::Environment,
     parse::{default_parser, Source, Span, Token},
     ser::{HtmlSerializer, InitSerializer as _, Serializer as _, SerializerError},
 };
+use textecca_stdlib as builtins;
 
 #[derive(StructOpt)]
 struct Opt {

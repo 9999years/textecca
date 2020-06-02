@@ -1,5 +1,5 @@
 [package]
-name = "textecca-bin"
+name = "textecca_stdlib"
 version = "0.0.1-alpha"
 authors = ["Rebecca Turner <rbt@sent.as>"]
 edition = "2018"
@@ -14,17 +14,24 @@ categories = [
     "text-processing",
     "command-line-utilities"
 ]
+# build = ""
+# exclude = []
+# include = []
 
-[[bin]]
-name = "textecca-bin"
-path = "main.rs"
+# [badges]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "textecca_stdlib"
+path = "lib.rs"
 
 [dependencies]
+derive_command = { path = "../derive_command" }
 textecca = { path = "../textecca" }
-textecca_stdlib = { path = "../std" }
-structopt = "0.3.14"
-thiserror = "1.0.19"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"  # Better assert_eq! and assert_ne! macros.
 indoc = "0.3.5" # Indented multiline strings.
+claim = "0.3.1"
+typed-builder = "0.6.0"

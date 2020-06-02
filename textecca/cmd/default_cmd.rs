@@ -18,7 +18,7 @@ impl<'i> DefaultCommand<'i> {
     fn from_args<'a>(
         parsed: &mut ParsedArgs<'a>,
     ) -> Result<Box<dyn Command<'a> + 'a>, FromArgsError> {
-        let doc = parsed.pop_positional()?;
+        let doc = parsed.pop_mandatory("doc")?;
         parsed.check_no_args()?;
         Ok(Box::new(DefaultCommand { doc }))
     }

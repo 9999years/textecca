@@ -1,6 +1,8 @@
 [workspace]
 members = [
+    "derive_command",
     "textecca",
+    "std",
     "bin",
     "friendly_html",
 ]

@@ -28,6 +28,7 @@ path = "lib.rs"
 
 [dependencies]
 friendly_html = { path = "../friendly_html" }
+derive_command = { path = "../derive_command" }
 nom = "5.1.1"  # Parsing.
 nom_locate = "2.0.0"  # Parser spans.
 wyz = "0.2.0"  # Utils. (Thanks so much for this one, myrrlyn!)

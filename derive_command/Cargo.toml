@@ -1,5 +1,5 @@
 [package]
-name = "derive_fromargs"
+name = "derive_command"
 version = "0.1.0"
 authors = ["Rebecca Turner <rbt@sent.as>"]
 edition = "2018"
@@ -11,8 +11,7 @@ proc-macro = true
 path = "lib.rs"
 
 [dependencies]
-textecca = { path = "../textecca" }
 syn = "1.0"
 quote = "1.0"
-Inflector = "0.11"
+heck = "0.3.1"
 proc-macro2 = "1.0.15"
