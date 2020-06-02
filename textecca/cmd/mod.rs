@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use crate::doc::{Block, Blocks, DocBuilder, DocBuilderError};
 use crate::env::Environment;
-use crate::parse::{self, Argument, Parser, Source, Tokens};
+use crate::parse::{self, Argument, Parser, Source, Token, Tokens};
 
 mod args;
 mod default_cmd;
@@ -143,4 +143,12 @@ pub enum CommandError<'i> {
     /// Error while creating the output document.
     #[error("{0}")]
     DocBuilder(#[from] DocBuilderError),
+
+    /// A `Thunk` was `Forced` where it was expected to be `Lazy`.
+    #[error("Expected thunk to be unevaluated")]
+    ForcedThunk,
+
+    /// A `Token` wasn't expected in the input.
+    #[error("Unexpected token {0:?}")]
+    BadToken(Token<'i>),
 }

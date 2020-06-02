@@ -32,6 +32,26 @@ impl TryInto<Blocks> for DocBuilder {
     }
 }
 
+impl TryInto<Inlines> for DocBuilder {
+    type Error = DocBuilderError;
+    fn try_into(self) -> Result<Inlines, Self::Error> {
+        let doc: Doc = self.try_into()?;
+        let mut blocks = doc.content;
+
+        if blocks.is_empty() {
+            Ok(Vec::new())
+        } else {
+            let block = blocks
+                .pop()
+                .ok_or_else(|| DocBuilderError::UnexpectedBlocks(blocks))?;
+            match block {
+                Block::Plain(inlines) | Block::Par(inlines) => Ok(inlines),
+                _ => Err(DocBuilderError::UnexpectedBlocks(vec![block])),
+            }
+        }
+    }
+}
+
 impl DocBuilder {
     /// Create a new builder.
     pub fn new() -> Self {
@@ -39,7 +59,7 @@ impl DocBuilder {
     }
 
     /// Create a new builder inheriting from the given parent.
-    pub fn new_inheriting(parent: &Self) -> Self {
+    pub fn new_inheriting(_parent: &Self) -> Self {
         Default::default()
     }
 
@@ -203,4 +223,8 @@ pub enum DocBuilderError {
     /// Attempted to push inline data to an empty TermList.
     #[error("Attempted to push inlines to empty termlist")]
     EmptyTermList,
+
+    /// Inlines were expected.
+    #[error("Unexpected blocks {0:?}")]
+    UnexpectedBlocks(Blocks),
 }

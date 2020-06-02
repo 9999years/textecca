@@ -25,6 +25,7 @@ path = "lib.rs"
 
 [dependencies]
 html5ever = "0.25.0"  # HTML parsing/serialization.
+thiserror = "1.0.19"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"  # Better assert_eq! and assert_ne! macros.

@@ -8,7 +8,7 @@ use thiserror::Error;
 use friendly_html as fh;
 
 use super::{InitSerializer, Serializer, SerializerError};
-use crate::doc::{Block, Blocks, Doc, Footnote, Heading, Inline, Inlines, List, ListKind};
+use crate::doc::{self, Block, Blocks, Doc, Footnote, Heading, Inline, Inlines, List, ListKind};
 
 mod slugify;
 pub use slugify::*;
@@ -79,12 +79,33 @@ impl<W: Write> HtmlSerializer<W> {
         Ok(())
     }
 
+    fn write_styled(
+        &mut self,
+        style: &doc::Style,
+        content: &Inlines,
+    ) -> Result<(), SerializerError> {
+        match style {
+            doc::Style::Emph => {
+                self.ser.elem("em")?;
+                self.write_inlines(content)?;
+                self.ser.end_elem()?;
+            }
+            doc::Style::Strong => {
+                self.ser.elem("strong")?;
+                self.write_inlines(content)?;
+                self.ser.end_elem()?;
+            }
+            _ => todo!("Unimplemented style {:?}", style),
+        }
+        Ok(())
+    }
+
     fn write_inline(&mut self, inline: Cow<Inline>) -> Result<(), SerializerError> {
         match inline.as_ref() {
             Inline::Text(content) => {
                 self.ser.write_text(content)?;
             }
-            Inline::Styled { .. } => todo!(),
+            Inline::Styled { style, content } => self.write_styled(&style, &content)?,
             Inline::Quote(quote) => {
                 let (l, r) = quote.kind.to_inlines();
                 self.write_inlines(&l)?;
@@ -108,7 +129,11 @@ impl<W: Write> HtmlSerializer<W> {
                 Inline::Footnote(footnote) => self.write_footnote(footnote)?,
                 _ => unreachable!(),
             },
-            Inline::Math(_) => todo!(),
+            Inline::Math(math) => {
+                let html =
+                    katex::render(&math.tex).map_err(|e| SerializerError::Other(Box::new(e)))?;
+                self.ser.write_html(&html)?;
+            }
         }
         Ok(())
     }
@@ -215,5 +240,14 @@ impl From<Heading> for HtmlError {
 impl Into<SerializerError> for HtmlError {
     fn into(self) -> SerializerError {
         SerializerError::Other(Box::new(self))
+    }
+}
+
+impl From<fh::SerializeError> for SerializerError {
+    fn from(err: fh::SerializeError) -> Self {
+        match err {
+            fh::SerializeError::Io(e) => SerializerError::Io(e),
+            _ => SerializerError::Other(Box::new(err)),
+        }
     }
 }

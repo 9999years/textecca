@@ -9,3 +9,7 @@ Third paragraph.
 Fourth paragraph.\footnote{Footnotes can contain multiple paragraphs!
 
 Here's the second paragraph.} Here, the fourth paragraph continues.
+
+Textecca now supports \emph{emphasis} and \strong{bold}. And \code{inline_code_spans} (sort-of).
+
+Mathematics are supported too: \math{\tau = \pi^2}.

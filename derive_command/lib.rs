@@ -1,5 +1,4 @@
 use proc_macro::{self, TokenStream};
-use proc_macro2::Span;
 use quote::quote;
 use syn::{DeriveInput, Ident};
 
@@ -28,6 +27,7 @@ fn impl_command_macro(ast: syn::DeriveInput) -> TokenStream {
     let fields = params.iter().map(|p| &p.field_ident);
     let struct_attrs = StructAttr::from_attrs(attrs);
     let cmd_name_lit = struct_attrs.cmd_name(&ident);
+    // TODO: Add support for custom parsers
     let gen = quote! {
         impl#generics #ident#generics {
             fn from_args<'a>(
