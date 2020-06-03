@@ -1,13 +1,13 @@
 use proc_macro::{self, TokenStream};
 use quote::quote;
-use syn::{DeriveInput, Ident};
+use syn::{DeriveInput, Ident, Path};
 
 mod attrs;
 mod param;
 use attrs::{FieldAttr, StructAttr};
 use param::Param;
 
-#[proc_macro_derive(CommandInfo)]
+#[proc_macro_derive(CommandInfo, attributes(textecca))]
 pub fn command_macro_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).expect("Failed to parse derive input as Rust.");
     impl_command_macro(ast)
@@ -24,10 +24,13 @@ fn impl_command_macro(ast: syn::DeriveInput) -> TokenStream {
     let parsed_args_ident: Ident = syn::parse_str("parsed__").unwrap();
     let params = struct_to_params(data);
     let params_code = params.iter().map(|p| p.to_tokens(&parsed_args_ident));
-    let fields = params.iter().map(|p| &p.field_ident);
+
     let struct_attrs = StructAttr::from_attrs(attrs);
+    let fields = params.iter().map(|p| &p.field_ident);
     let cmd_name_lit = struct_attrs.cmd_name(&ident);
-    // TODO: Add support for custom parsers
+    let default_parser: Path = syn::parse_str("::textecca::parse::default_parser").unwrap();
+    let parser_expr = struct_attrs.parser(&default_parser);
+
     let gen = quote! {
         impl#generics #ident#generics {
             fn from_args<'a>(
@@ -51,6 +54,10 @@ fn impl_command_macro(ast: syn::DeriveInput) -> TokenStream {
 
             fn from_args_fn() -> ::textecca::cmd::FromArgs {
                 Self::from_args
+            }
+
+            fn parser_fn() -> ::textecca::parse::Parser {
+                #parser_expr
             }
         }
     };

@@ -78,6 +78,7 @@ impl<'i> Command<'i> for Footnote<'i> {
 }
 
 #[derive(Debug, CommandInfo)]
+#[textecca(parser = literal_parser)]
 pub struct Code<'i> {
     content: Thunk<'i>,
 }
@@ -132,6 +133,7 @@ impl<'i> Command<'i> for Strong<'i> {
 }
 
 #[derive(Debug, CommandInfo)]
+#[textecca(parser = literal_parser)]
 pub struct Math<'i> {
     content: Thunk<'i>,
 }

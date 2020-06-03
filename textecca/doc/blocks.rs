@@ -211,3 +211,10 @@ pub struct LineNumbers {
     /// The starting line number.
     pub start: i32,
 }
+
+/// A display math block.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Math {
+    /// The LaTeX math code.
+    pub tex: String,
+}

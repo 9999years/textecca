@@ -21,7 +21,7 @@ pub fn default_parser<'i>(
     input: Span<'i>,
 ) -> Result<Tokens<'i>, Box<dyn Error + 'i>> {
     all_consuming(many0(alt((
-        map(parse_command(0), Token::from),
+        map(parse_command(arena, 0), Token::from),
         map(recognize(many1(none_of("\\\r\n"))), Token::from),
         newlines(arena.alloc_spans("par".into())),
     ))))(input)

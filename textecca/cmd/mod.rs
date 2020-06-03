@@ -85,7 +85,7 @@ pub trait Command<'i>: std::fmt::Debug {
     /// beginning of a line into `\item`, the returned environment should have
     /// `\item` bound.
     fn environment(&self, parent: Rc<Environment>) -> Result<Rc<Environment>, CommandError> {
-        Ok(Environment::new_inheriting(parent))
+        Ok(parent)
     }
 }
 

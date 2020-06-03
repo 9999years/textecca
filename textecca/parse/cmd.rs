@@ -15,7 +15,7 @@ use super::parse_util::{
     take_inline_space1, take_letter1, take_not_inline_space1, take_number1, take_punctuation1,
     take_symbol1,
 };
-use super::Span;
+use super::{Source, Span};
 
 /// A parsed command, consisting of a name and arguments.
 #[derive(Clone, Debug, PartialEq)]
@@ -61,11 +61,17 @@ impl<'i> Argument<'i> {
 
 /// Parse a string with balanced braces.
 fn balanced_braces<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span, E> {
-    recognize(many0(alt((
-        recognize(none_of("{}\\")),
-        recognize(preceded(tag("\\"), one_of("{}"))),
-        brace_group,
-    ))))(i)
+    context(
+        "balanced braces",
+        recognize(many0(alt((
+            recognize(none_of("{}\\")),
+            // Escaped braces
+            recognize(preceded(tag("\\"), one_of("{}"))),
+            // Other escapes are passed through literally.
+            recognize(pair(tag("\\"), anychar)),
+            brace_group,
+        )))),
+    )(i)
 }
 
 /// Recognize a group of braces.
@@ -78,23 +84,37 @@ fn command_kwarg_name<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span,
     recognize(many0(none_of("\\{}$=")))(i)
 }
 
-fn command_kwarg_value<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Option<Span>, E> {
-    opt(preceded(take_char('='), balanced_braces))(i)
+fn command_kwarg_value<'a, E: ParseError<Span<'a>>>(
+    i: Span<'a>,
+) -> IResult<Span, (Option<char>, Span), E> {
+    pair(opt(take_char('=')), balanced_braces)(i)
 }
 
 /// Parse a command argument.
-fn command_arg<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Argument, E> {
+fn command_arg<'a, E: ParseError<Span<'a>>>(
+    arena: &'a Source,
+    i: Span<'a>,
+) -> IResult<Span<'a>, Argument<'a>, E> {
     preceded(
         opt(take_inline_space1),
         map(
             delimited(
                 take_char('{'),
-                pair(command_kwarg_name, command_kwarg_value),
+                cut(pair(command_kwarg_name, command_kwarg_value)),
                 cut(take_char('}')),
             ),
-            |(name, val)| Argument {
-                name: val.map(|_| name),
-                value: val.unwrap_or(name),
+            |(name, (eq_tok, val))| Argument {
+                name: eq_tok.map(|_| name),
+                value: eq_tok.map(|_| val).unwrap_or(arena.alloc_span(
+                    {
+                        let mut nameval =
+                            String::with_capacity(name.fragment().len() + val.fragment().len());
+                        nameval.push_str(name.fragment());
+                        nameval.push_str(val.fragment());
+                        nameval
+                    },
+                    name,
+                )),
             },
         ),
     )(i)
@@ -107,18 +127,24 @@ fn command_name<'a, E: ParseError<Span<'a>>>(i: Span<'a>) -> IResult<Span, Span,
 
 /// Parse a command and at least `mandatory_args` args.
 pub fn parse_command<'a, E: ParseError<Span<'a>>>(
+    arena: &'a Source,
     mandatory_args: usize,
 ) -> impl Fn(Span<'a>) -> IResult<Span, Command, E> {
-    context(
-        "command",
-        map(
-            pair(
-                command_name,
-                cut(many_at_least(mandatory_args, complete(command_arg))),
+    move |i| {
+        context(
+            "command",
+            map(
+                pair(
+                    command_name,
+                    cut(many_at_least(
+                        mandatory_args,
+                        complete(|i| command_arg(arena, i)),
+                    )),
+                ),
+                |(name, args)| Command { name, args },
             ),
-            |(name, args)| Command { name, args },
-        ),
-    )
+        )(i)
+    }
 }
 
 #[cfg(test)]

@@ -25,6 +25,12 @@ impl Doc {
             ..Default::default()
         }
     }
+
+    /// Does this document contain any math blocks or inlines?
+    pub fn has_math(&self) -> bool {
+        // TODO: An actual tree-traversal.
+        true
+    }
 }
 
 /// Document metadata.
@@ -71,6 +77,9 @@ pub enum Block {
 
     /// Blocks tagged with some metadata.
     Tagged(Blocks),
+
+    /// Display math
+    Math(Math),
 }
 
 /// A sequence of `Inline`s.

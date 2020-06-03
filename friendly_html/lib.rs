@@ -91,10 +91,14 @@ impl<W: Write> HtmlSerializer<W> {
     pub fn elem(&mut self, name: impl AsRef<str>) -> Result<(), SerializeError> {
         let tag_name = html_name(&name);
         // We'll need to close a non-void tag.
-        if !is_void(&name) {
-            self.elems.push(tag_name.clone());
+        let elem_is_void = is_void(&name);
+        let ret = Ok(self.ser.start_elem(tag_name.clone(), iter::empty())?);
+        if elem_is_void {
+            self.ser.end_elem(tag_name)?;
+        } else {
+            self.elems.push(tag_name);
         }
-        Ok(self.ser.start_elem(tag_name, iter::empty())?)
+        ret
     }
 
     /// Serialize the start of an element with attributes.
@@ -110,13 +114,17 @@ impl<W: Write> HtmlSerializer<W> {
             .map(|(name, value)| (attr_name(name), value))
             .collect();
         let tag_name = html_name(&name);
-        if !is_void(&name) {
-            self.elems.push(tag_name.clone());
-        }
-        Ok(self.ser.start_elem(
-            tag_name,
+        let elem_is_void = is_void(&name);
+        let ret = Ok(self.ser.start_elem(
+            tag_name.clone(),
             attrs.iter().map(|(name, value)| (name, value.as_ref())),
-        )?)
+        )?);
+        if elem_is_void {
+            self.ser.end_elem(tag_name)?;
+        } else {
+            self.elems.push(tag_name);
+        }
+        ret
     }
 
     /// Close the last-opened element.
