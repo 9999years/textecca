@@ -16,13 +16,13 @@ use pretty_assertions::assert_eq;
 use super::{Source, Span};
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Input {
-    pub span: Span<'static>,
+pub struct Input<'i> {
+    pub span: Span<'i>,
     pub arena: Source,
 }
 
-impl Input {
-    pub fn new(input: &'static str) -> Self {
+impl<'i> Input<'i> {
+    pub fn new(input: &'i str) -> Self {
         Self {
             span: Span::new(input),
             arena: Source::new(input.to_owned()),
@@ -95,14 +95,14 @@ impl Input {
 
     pub fn slice<R>(&self, range: R) -> Span
     where
-        Span<'static>: Slice<R>,
+        Span<'i>: Slice<R>,
     {
         self.span.slice(range)
     }
 }
 
-impl Into<&'static str> for Input {
-    fn into(self) -> &'static str {
+impl<'i> Into<&'i str> for Input<'i> {
+    fn into(self) -> &'i str {
         self.span.fragment()
     }
 }
@@ -116,7 +116,7 @@ fn assert_parse_incomplete(needed: nom::Needed) {
 }
 
 #[derive(TypedBuilder)]
-pub struct AssertParse<Parser, O> {
+pub struct AssertParse<'i, Parser, O> {
     parser: Parser,
 
     #[builder(default = false)]
@@ -126,20 +126,22 @@ pub struct AssertParse<Parser, O> {
     ok: Box<dyn Fn(&Input, O) -> ()>,
 
     #[builder(default=Box::new(|err| assert_parse_err(err)))]
-    err: Box<dyn Fn((Span<'static>, ErrorKind)) -> ()>,
+    err: Box<dyn Fn((Span<'i>, ErrorKind)) -> ()>,
 
     #[builder(default=Box::new(|needed| assert_parse_incomplete(needed)))]
     incomplete: Box<dyn Fn(nom::Needed) -> ()>,
 
     #[builder(default=Box::new(|_i, _rest| ()))]
-    rest: Box<dyn Fn(&Input, Span<'static>) -> ()>,
+    rest: Box<dyn Fn(&Input, Span<'i>) -> ()>,
 }
 
-impl<Parser, O> AssertParse<Parser, O>
+impl<'i, Parser, O> AssertParse<'i, Parser, O>
 where
-    Parser: Fn(Span<'static>) -> IResult<Span<'static>, O, (Span<'static>, ErrorKind)>,
+    Parser: Fn(Span<'i>) -> IResult<Span<'i>, O, (Span<'i>, ErrorKind)>,
 {
-    pub fn new(parser: Parser) -> AssertParseBuilder<((Parser,), (), (), (), (), ()), Parser, O> {
+    pub fn new(
+        parser: Parser,
+    ) -> AssertParseBuilder<'i, ((Parser,), (), (), (), (), ()), Parser, O> {
         Self::builder().parser(parser)
     }
 

@@ -153,7 +153,7 @@ impl DocBuilder {
                 Self::add_to_blocks(current, blocks)?;
             }
 
-            Block::Rule => return Ok(Some(Self::to_block(current))),
+            Block::Rule | Block::Math(_) => return Ok(Some(Self::to_block(current))),
 
             Block::Code(code) => Self::add_to_code(current, code),
             Block::List(list) => Self::add_to_list(current, list)?,

@@ -207,7 +207,8 @@ mod test {
 
     #[test]
     fn test_command_arg() {
-        let assert = || AssertParse::new(command_arg);
+        let source = Source::new("".into());
+        let assert = || AssertParse::new(|i| command_arg(&source, i));
 
         assert()
             .ok(Box::new(|input, arg| {
@@ -239,8 +240,11 @@ mod test {
 
     #[test]
     fn test_command() {
+        let source = Source::new("".into());
+        let parse_command_ = |n| parse_command(&source, n);
+
         // "At least 0 args" will absorb the 1 arg.
-        AssertParse::new(parse_command(0))
+        AssertParse::new(parse_command_(0))
             .ok(Box::new(|i, cmd| {
                 assert_eq!(
                     Command {
@@ -254,7 +258,7 @@ mod test {
             .assert("\\x {y}");
 
         // Here we have 1 arg.
-        AssertParse::new(parse_command(1))
+        AssertParse::new(parse_command_(1))
             .ok(Box::new(|i, cmd| {
                 assert_eq!(
                     Command {
@@ -268,7 +272,7 @@ mod test {
             .assert("\\section{Whatever}");
 
         // We don't have 3 arguments
-        AssertParse::new(parse_command(3))
+        AssertParse::new(parse_command_(3))
             .ok(Box::new(|_, _| panic!("Unexpected Ok")))
             .err(Box::new(|(_rest, _kind)| ()))
             .build()
