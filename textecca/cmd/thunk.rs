@@ -1,7 +1,7 @@
 use std::{convert::TryInto, rc::Rc};
 
 use super::{CommandError, ParsedArgs, World};
-use crate::doc::{Block, Blocks, DocBuilder, DocBuilderPush, Inline, Inlines};
+use crate::doc::{BlockInner, Blocks, DocBuilder, DocBuilderPush, Inline, Inlines};
 use crate::env::Environment;
 use crate::parse::{Source, Token, Tokens};
 

@@ -4,10 +4,12 @@ use std::io::{self, Write};
 
 use thiserror::Error;
 
-use crate::doc::Block;
+use crate::doc::BlockInner;
 use crate::doc::Doc;
 
+mod helpers;
 mod html;
+pub use helpers::*;
 pub use html::*;
 
 /// An error while serializing a document.

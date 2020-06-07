@@ -5,7 +5,7 @@ use derive_command::CommandInfo;
 
 use textecca::{
     cmd::{Command, CommandError, CommandInfo, Thunk, World},
-    doc::{self, Block, DocBuilder, DocBuilderPush as _, Heading, Inline},
+    doc::{self, BlockInner, DocBuilder, DocBuilderPush as _, Heading, Inline},
     env::Environment,
     parse::{Source, Span, Token, Tokens},
 };
@@ -19,6 +19,7 @@ pub fn import(env: &mut Environment) {
     env.add_binding::<Emph>();
     env.add_binding::<Strong>();
     env.add_binding::<Math>();
+    env.add_binding::<Equation>();
 }
 
 fn literal_parser<'i>(
@@ -36,7 +37,7 @@ impl<'i> Command<'i> for Par {
         doc: &mut DocBuilder,
         _world: &World<'i>,
     ) -> Result<(), CommandError<'i>> {
-        doc.push(Block::Par(Default::default()))?;
+        doc.push(BlockInner::Par(Default::default()))?;
         Ok(())
     }
 }
@@ -51,7 +52,7 @@ impl<'i> Command<'i> for Sec<'i> {
         doc: &mut DocBuilder,
         world: &World<'i>,
     ) -> Result<(), CommandError<'i>> {
-        doc.push(Block::Heading(Heading {
+        doc.push(BlockInner::Heading(Heading {
             level: 1,
             text: Default::default(),
         }))?;
@@ -144,6 +145,24 @@ impl<'i> Command<'i> for Math<'i> {
         _world: &World<'i>,
     ) -> Result<(), CommandError<'i>> {
         doc.push(Inline::Math(doc::InlineMath {
+            tex: self.content.into_string()?,
+        }))?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, CommandInfo)]
+#[textecca(parser = literal_parser)]
+pub struct Equation<'i> {
+    content: Thunk<'i>,
+}
+impl<'i> Command<'i> for Equation<'i> {
+    fn call(
+        self: Box<Self>,
+        doc: &mut DocBuilder,
+        _world: &World<'i>,
+    ) -> Result<(), CommandError<'i>> {
+        doc.push(BlockInner::Math(doc::Math {
             tex: self.content.into_string()?,
         }))?;
         Ok(())

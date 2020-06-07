@@ -4,16 +4,20 @@ use std::mem;
 use std::{borrow::Cow, vec};
 
 use thiserror::Error;
+use typed_html::html;
 
 use friendly_html as fh;
 
 use super::{InitSerializer, Serializer, SerializerError};
-use crate::doc::{self, Block, Blocks, Doc, Footnote, Heading, Inline, Inlines, List, ListKind};
+use crate::doc::{
+    self, Block, BlockInner, Blocks, Doc, Footnote, Heading, Inline, Inlines, List, ListKind,
+};
 
-mod slugify;
-pub use slugify::*;
 mod math;
+mod slugify;
+
 use math::*;
+pub use slugify::*;
 
 /// Serializer to HTML5.
 pub struct HtmlSerializer<W: Write> {
@@ -53,6 +57,7 @@ impl<W: Write> HtmlSerializer<W> {
         self.ser.elem("head")?;
         self.ser.write_text("\n")?;
         if doc.has_math() {
+            // TODO: Don't hardcode KaTeX tag.
             self.ser.elem_attrs(
                 "link",
                 &[
@@ -174,24 +179,24 @@ impl<W: Write> HtmlSerializer<W> {
     }
 
     fn write_block(&mut self, block: Block) -> Result<(), SerializerError> {
-        match block {
-            Block::Plain(inlines) => {
+        match block.inner {
+            BlockInner::Plain(inlines) => {
                 self.write_inlines(&inlines)?;
             }
-            Block::Par(inlines) => {
+            BlockInner::Par(inlines) => {
                 self.ser.write_text("\n")?;
                 self.ser.elem("p")?;
                 self.write_inlines(&inlines)?;
                 self.ser.end_elem()?;
             }
-            Block::Code(_) => todo!(),
-            Block::Quote(quote) => {
+            BlockInner::Code(_) => todo!(),
+            BlockInner::Quote(quote) => {
                 self.ser.elem("blockquote")?;
                 self.write_blocks(quote)?;
                 self.ser.end_elem()?;
             }
-            Block::List(list) => self.write_list(list)?,
-            Block::Heading(heading) => {
+            BlockInner::List(list) => self.write_list(list)?,
+            BlockInner::Heading(heading) => {
                 if !(1..6).contains(&heading.level) {
                     return Err(HtmlError::from(heading).into());
                 }
@@ -207,18 +212,17 @@ impl<W: Write> HtmlSerializer<W> {
 
                 self.ser.end_elem()?;
             }
-            Block::Rule => {
+            BlockInner::Rule => {
                 self.ser.elem("hr")?;
             }
-            Block::Math(math) => {
+            BlockInner::Math(math) => {
                 self.ser
                     .write_html(&render_tex(&math.tex, MathMode::Display)?)?;
             }
-            Block::Table(_) => todo!(),
-            Block::Figure(_) => todo!(),
-            Block::Defn(_) => todo!(),
-            Block::Tagged(_) => todo!(),
-            Block::TermList(_) => todo!(),
+            BlockInner::Table(_) => todo!(),
+            BlockInner::Figure(_) => todo!(),
+            BlockInner::Defn(_) => todo!(),
+            BlockInner::TermList(_) => todo!(),
         }
         Ok(())
     }
@@ -231,8 +235,8 @@ impl<W: Write> HtmlSerializer<W> {
         self.ser
             .elem_attrs("a", &[("href", &format!("#{}", &id)), ("id", &return_id)])?;
         self.ser.write_text(format!("[{}]", num))?;
-        self.ser.end_elem()?;
-        self.ser.end_elem()?;
+        self.ser.end_elem()?; // </a>
+        self.ser.end_elem()?; // </sup>
         self.footnotes.push(MarkedFootnote {
             id,
             return_id,

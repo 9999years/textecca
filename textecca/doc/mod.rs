@@ -6,11 +6,15 @@
 mod blocks;
 mod builder;
 mod inlines;
+mod iter;
 mod length;
+mod ref_id;
 mod structure;
 
 pub use blocks::*;
 pub use builder::*;
 pub use inlines::*;
+pub use iter::*;
 pub use length::*;
+pub use ref_id::*;
 pub use structure::*;

@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use textecca::{
     cmd::{CommandError, DefaultCommand, Thunk, World},
-    doc::{Block, Doc, DocBuilder, DocBuilderError, DocBuilderPush, Inline},
+    doc::{BlockInner, Doc, DocBuilder, DocBuilderError, DocBuilderPush, Inline},
     env::Environment,
     parse::{default_parser, Source, Span, Token},
     ser::{HtmlSerializer, InitSerializer as _, Serializer as _, SerializerError},

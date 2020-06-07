@@ -47,7 +47,7 @@ impl Default for TableCell {
             alignment: None,
             row_span: 1,
             col_span: 1,
-            content: Vec::new(),
+            content: Default::default(),
         }
     }
 }

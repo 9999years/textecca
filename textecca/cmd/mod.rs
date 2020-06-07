@@ -11,7 +11,7 @@ use std::rc::Rc;
 use derivative::Derivative;
 use thiserror::Error;
 
-use crate::doc::{Block, Blocks, DocBuilder, DocBuilderError};
+use crate::doc::{BlockInner, Blocks, DocBuilder, DocBuilderError};
 use crate::env::Environment;
 use crate::parse::{self, Argument, Parser, Source, Token, Tokens};
 

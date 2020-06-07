@@ -92,31 +92,12 @@ fn command_kwarg_value<'a, E: ParseError<Span<'a>>>(
 
 /// Parse a command argument.
 fn command_arg<'a, E: ParseError<Span<'a>>>(
-    arena: &'a Source,
+    _arena: &'a Source,
     i: Span<'a>,
 ) -> IResult<Span<'a>, Argument<'a>, E> {
     preceded(
         opt(take_inline_space1),
-        map(
-            delimited(
-                take_char('{'),
-                cut(pair(command_kwarg_name, command_kwarg_value)),
-                cut(take_char('}')),
-            ),
-            |(name, (eq_tok, val))| Argument {
-                name: eq_tok.map(|_| name),
-                value: eq_tok.map(|_| val).unwrap_or(arena.alloc_span(
-                    {
-                        let mut nameval =
-                            String::with_capacity(name.fragment().len() + val.fragment().len());
-                        nameval.push_str(name.fragment());
-                        nameval.push_str(val.fragment());
-                        nameval
-                    },
-                    name,
-                )),
-            },
-        ),
+        map(brace_group, |value| Argument { name: None, value }),
     )(i)
 }
 

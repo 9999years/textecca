@@ -4,5 +4,5 @@ members = [
     "textecca",
     "std",
     "bin",
-    "friendly_html",
+    "friendly_html"
 ]

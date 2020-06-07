@@ -3,8 +3,8 @@ use std::{convert::TryInto, mem};
 use thiserror::Error;
 
 use super::{
-    Block, Blocks, Code, Defn, Doc, Figure, Heading, Inline, Inlines, List, ListItem, Table,
-    TableCell, TermListItem,
+    Block, BlockInner, Blocks, Code, Defn, Doc, Figure, Heading, Id, Inline, Inlines, List,
+    ListItem, Table, TableCell, TermListItem,
 };
 use crate::parse::Span;
 
@@ -12,7 +12,12 @@ use crate::parse::Span;
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct DocBuilder {
     doc: Doc,
+    inner: DocBuilderInner,
+}
+#[derive(Debug, Default, Clone, PartialEq)]
+struct DocBuilderInner {
     current: Inlines,
+    id: Id,
 }
 
 impl TryInto<Doc> for DocBuilder {
@@ -39,14 +44,14 @@ impl TryInto<Inlines> for DocBuilder {
         let mut blocks = doc.content;
 
         if blocks.is_empty() {
-            Ok(Vec::new())
+            Ok(Default::default())
         } else {
             let block = blocks
                 .pop()
                 .ok_or_else(|| DocBuilderError::UnexpectedBlocks(blocks))?;
-            match block {
-                Block::Plain(inlines) | Block::Par(inlines) => Ok(inlines),
-                _ => Err(DocBuilderError::UnexpectedBlocks(vec![block])),
+            match block.inner {
+                BlockInner::Plain(inlines) | BlockInner::Par(inlines) => Ok(inlines),
+                _ => Err(DocBuilderError::UnexpectedBlocks(block.into())),
             }
         }
     }
@@ -63,55 +68,71 @@ impl DocBuilder {
         Default::default()
     }
 
-    fn to_block(current: &mut Inlines) -> Block {
-        Block::Par(mem::take(current))
-    }
-
-    fn add_to_blocks(current: &mut Inlines, blocks: &mut Blocks) -> Result<(), DocBuilderError> {
-        match blocks.last_mut() {
-            None => {
-                blocks.push(Self::to_block(current));
-            }
-            Some(block) => {
-                if let Some(new_block) = Self::add_to_block(current, block)? {
-                    blocks.push(new_block);
-                }
-            }
+    fn drain_current(&mut self) -> Result<(), DocBuilderError> {
+        if self.inner.is_empty() {
+            Ok(())
+        } else {
+            self.inner.add_to_blocks(&mut self.doc.content)
         }
-        Ok(())
+    }
+}
+
+impl DocBuilderInner {
+    fn is_empty(&self) -> bool {
+        self.current.is_empty()
     }
 
-    fn add_to_list(current: &mut Inlines, list: &mut List) -> Result<(), DocBuilderError> {
+    fn inc_id(&mut self) -> Id {
+        let id = self.id;
+        self.id = self.id.next().unwrap();
+        id
+    }
+
+    fn take_current(&mut self) -> Inlines {
+        mem::take(&mut self.current)
+    }
+
+    fn block_from_inner(&mut self, inner: BlockInner) -> Block {
+        Block {
+            id: self.inc_id(),
+            inner,
+        }
+    }
+
+    fn to_block(&mut self) -> Block {
+        let inner = BlockInner::Par(self.take_current());
+        self.block_from_inner(inner)
+    }
+
+    fn add_to_list(&mut self, list: &mut List) -> Result<(), DocBuilderError> {
         match list.items.last_mut() {
             None => {
                 list.items.push(ListItem {
-                    content: vec![Self::to_block(current)],
+                    content: self.to_block().into(),
                 });
                 Ok(())
             }
-            Some(item) => Self::add_to_blocks(current, &mut item.content),
+            Some(item) => self.add_to_blocks(&mut item.content),
         }
     }
 
-    fn add_to_termlist(
-        current: &mut Inlines,
-        list: &mut Vec<TermListItem>,
-    ) -> Result<(), DocBuilderError> {
+    fn add_to_termlist(&mut self, list: &mut Vec<TermListItem>) -> Result<(), DocBuilderError> {
         match list.last_mut() {
             None => Err(DocBuilderError::EmptyTermList),
             Some(item) => {
-                Self::add_to_blocks(current, &mut item.content)?;
+                self.add_to_blocks(&mut item.content)?;
                 Ok(())
             }
         }
     }
 
-    fn add_to_table(current: &mut Inlines, table: &mut Table) {
+    fn add_to_table(&mut self, table: &mut Table) {
         match table.cells.last_mut().and_then(|row| row.last_mut()) {
             None => {
                 let mut row = Vec::with_capacity(table.columns.len());
+                let inner = BlockInner::Plain(self.take_current());
                 row.push(TableCell {
-                    content: vec![Block::Plain(mem::take(current))],
+                    content: self.block_from_inner(inner).into(),
                     ..Default::default()
                 });
                 table.cells.push(row);
@@ -120,55 +141,58 @@ impl DocBuilder {
         }
     }
 
-    fn add_to_code(current: &mut Inlines, code: &mut Code) {
+    fn add_to_code(&mut self, code: &mut Code) {
         match code.lines.last_mut() {
             None => {
-                code.lines.push(mem::take(current));
+                code.lines.push(self.take_current());
             }
             Some(inlines) => {
-                inlines.append(current);
+                inlines.append(&mut self.current);
             }
         }
     }
 
-    fn add_to_block(
-        current: &mut Inlines,
-        block: &mut Block,
-    ) -> Result<Option<Block>, DocBuilderError> {
+    #[must_use]
+    fn add_to_block(&mut self, block: &mut BlockInner) -> Result<Option<Block>, DocBuilderError> {
         match block {
-            Block::Plain(inlines)
-            | Block::Par(inlines)
-            | Block::Heading(Heading { text: inlines, .. })
-            | Block::Figure(Figure {
+            BlockInner::Plain(inlines)
+            | BlockInner::Par(inlines)
+            | BlockInner::Heading(Heading { text: inlines, .. })
+            | BlockInner::Figure(Figure {
                 caption: inlines, ..
             }) => {
-                inlines.append(current);
+                inlines.append(&mut self.current);
             }
 
-            Block::Quote(blocks)
-            | Block::Tagged(blocks)
-            | Block::Defn(Defn {
+            BlockInner::Quote(blocks)
+            | BlockInner::Defn(Defn {
                 content: blocks, ..
             }) => {
-                Self::add_to_blocks(current, blocks)?;
+                self.add_to_blocks(blocks)?;
             }
 
-            Block::Rule | Block::Math(_) => return Ok(Some(Self::to_block(current))),
+            BlockInner::Rule | BlockInner::Math(_) => return Ok(Some(self.to_block())),
 
-            Block::Code(code) => Self::add_to_code(current, code),
-            Block::List(list) => Self::add_to_list(current, list)?,
-            Block::Table(table) => Self::add_to_table(current, table),
-            Block::TermList(list) => Self::add_to_termlist(current, list)?,
+            BlockInner::Code(code) => self.add_to_code(code),
+            BlockInner::List(list) => self.add_to_list(list)?,
+            BlockInner::Table(table) => self.add_to_table(table),
+            BlockInner::TermList(list) => self.add_to_termlist(list)?,
         }
         Ok(None)
     }
 
-    fn drain_current(&mut self) -> Result<(), DocBuilderError> {
-        if !self.current.is_empty() {
-            Self::add_to_blocks(&mut self.current, &mut self.doc.content)
-        } else {
-            Ok(())
+    fn add_to_blocks(&mut self, blocks: &mut Blocks) -> Result<(), DocBuilderError> {
+        match blocks.last_mut() {
+            None => {
+                blocks.push(self.to_block());
+            }
+            Some(block) => {
+                if let Some(new_block) = self.add_to_block(block)? {
+                    blocks.push(new_block);
+                }
+            }
         }
+        Ok(())
     }
 }
 
@@ -178,10 +202,10 @@ pub trait DocBuilderPush<T> {
     fn push(&mut self, elem: T) -> Result<(), DocBuilderError>;
 }
 
-impl DocBuilderPush<Block> for DocBuilder {
-    fn push(&mut self, elem: Block) -> Result<(), DocBuilderError> {
+impl DocBuilderPush<BlockInner> for DocBuilder {
+    fn push(&mut self, elem: BlockInner) -> Result<(), DocBuilderError> {
         self.drain_current()?;
-        self.doc.content.push(elem);
+        self.doc.content.push(self.inner.block_from_inner(elem));
         Ok(())
     }
 }
@@ -197,7 +221,7 @@ impl DocBuilderPush<Blocks> for DocBuilder {
 
 impl DocBuilderPush<Inline> for DocBuilder {
     fn push(&mut self, elem: Inline) -> Result<(), DocBuilderError> {
-        self.current.push(elem);
+        self.inner.current.push(elem);
         Ok(())
     }
 }
@@ -205,14 +229,16 @@ impl DocBuilderPush<Inline> for DocBuilder {
 impl DocBuilderPush<Inlines> for DocBuilder {
     fn push(&mut self, elem: Inlines) -> Result<(), DocBuilderError> {
         let mut elem = elem;
-        self.current.append(&mut elem);
+        self.inner.current.append(&mut elem);
         Ok(())
     }
 }
 
 impl<'i> DocBuilderPush<Span<'i>> for DocBuilder {
     fn push(&mut self, elem: Span<'i>) -> Result<(), DocBuilderError> {
-        self.current.push(Inline::Text(elem.fragment().to_string()));
+        self.inner
+            .current
+            .push(Inline::Text(elem.fragment().to_string()));
         Ok(())
     }
 }
