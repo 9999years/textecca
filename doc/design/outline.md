@@ -67,5 +67,8 @@ What's wrong with what we've got?
 ## Why it's a lot of work
 
   - Whitespace & language design
+  - Package managment
+  - Devtools
+  - Compiling
 
 ## How we can fix it
