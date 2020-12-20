@@ -4,7 +4,7 @@
 
 The internal representation of rendered documents is based on [Pandoc][Text.Pandoc.Definition].
 
-The semantic nature and multiple backengs of [reST/Sphinx][reST] are good.
+The semantic nature and multiple backends of [reST/Sphinx][reST] are good.
 
 I admire the versatility of LaTeX and the many DSLs people have managed to create in it over the years.
 
