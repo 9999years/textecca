@@ -58,5 +58,16 @@ language.
 
 ## Concept-based authoring
 
+Documents, and human language in general, are filled with references to other
+pieces of information; sometimes in documents, sometimes not. Different sorts
+of documents make these references and links more or less explicit ---
+Wikipedia is filled with links to other pages and citations, but even the most
+thoroughly-researched historical fiction will go to great lengths to hide that
+fact.
+
+My working memory and ability to memorize definitions are extremely limited, so
+explicit references can be extremely useful to me --- documents that can remind
+me of context or relevant definitions are much more accessible.
+
 [working-memory]: https://en.wikipedia.org/wiki/Working_memory
 [dsl]: https://en.wikipedia.org/wiki/Domain-specific_language
