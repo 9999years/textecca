@@ -35,3 +35,7 @@
 - https://www.pc-freak.net/blog/files/NCR_ATM_terminals/www.thecorememory.com/THTHS.pdf
 
 - Parsing TeX is Turing complete: https://tex.stackexchange.com/a/4205
+
+- Xanadu
+
+  https://en.wikipedia.org/wiki/Project_Xanadu

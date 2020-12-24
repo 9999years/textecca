@@ -34,15 +34,27 @@ We can leverage this concept to avoid several of TeX's most confusing behaviors
 around parsing *while* avoiding the author-side overhead of a more verbose
 language.
 
+## TeX's flexibility is a double-edged sword
+
+- TeX is an *incredibly* dynamic language.
+- Macro expansion is astonishingly flexible — and makes error messages *really
+  bad,* and static analysis largely impossible.
+
 ## DSLs
 
 - I believe TeX's support for [DSLs][dsl] is one of its greatest strengths. The
   same flexibility that makes the macro system so intimidating, confusing, and
   complicated allows package authors to embed nearly any language in TeX,
   limited only by the package author's willingness to write code in TeX.
+
 - What would DSLs look like in non plain text? Would there be style
   instructions? Does defining a DSL turn from a compiler problem to a GUI
   problem?
+
+- If we remove the design constraint that plain-text code must be concise, that
+  is, by separating the input keystrokes from what the parser and compiler see,
+  we can create an interface that's less hellish for users, viewers, and
+  compilers.
 
 ## Concept-based authoring
 
