@@ -69,5 +69,22 @@ My working memory and ability to memorize definitions are extremely limited, so
 explicit references can be extremely useful to me --- documents that can remind
 me of context or relevant definitions are much more accessible.
 
+Traditional paper documents have handled links through various numbering
+schemes; textbooks often have numbered chapters, sections, figures, theorems,
+examples, and problems, which are all referred to by number throughout the
+text. When designing TeX, Knuth created tools for incrementing and displaying
+various counters to automate numbering of sections and figures, but didn't take
+the concept any further. Later, pdfTeX would enable these numbered references
+to be clickable links to other pages, but PDF viewers are bad at preserving
+context --- viewing history within a document is opaque and difficult to
+navigate, if navigable at all.
+
+Can we take this further? Browser extensions like [WikiWand][wikiwand] show
+previews of linked articles without navigating to a separate page, just like
+IDEs can often show a function's documentation or implementation in a small
+window without losing context --- we should be able to access linked context in
+the same way within written documents.
+
 [working-memory]: https://en.wikipedia.org/wiki/Working_memory
 [dsl]: https://en.wikipedia.org/wiki/Domain-specific_language
+[wikiwand]: https://chrome.google.com/webstore/detail/wikiwand-wikipedia-modern/emffkefkbkpkgpdeeooapgaicgmcbolj
