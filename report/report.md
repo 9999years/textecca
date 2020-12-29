@@ -39,6 +39,8 @@ language.
 - TeX is an *incredibly* dynamic language.
 - Macro expansion is astonishingly flexible — and makes error messages *really
   bad,* and static analysis largely impossible.
+- The design constraints of TeX --- in particular, the need for brevity ---
+  makes TeX source largely unreadable.
 
 ## DSLs
 
@@ -84,6 +86,16 @@ previews of linked articles without navigating to a separate page, just like
 IDEs can often show a function's documentation or implementation in a small
 window without losing context --- we should be able to access linked context in
 the same way within written documents.
+
+How else can we take advantage of browsers? One area that physical paper excels
+at is note-taking --- paper offers virtually no constraints on formatting, so
+organization is free-form and up to the individual note-taker. PDF readers and
+browsers rarely offer good built-in options for note-taking, as well. Though
+some office software suites offer decent commenting and reviewing facilities,
+they're often strained by long-form conversations, difficult to browse, share,
+and merge, and are often limited in expressiveness and formatting (it's rare to
+be able to annotate in bold or italics, much less add drawings or images, even
+though physical paper makes this effortless).
 
 [working-memory]: https://en.wikipedia.org/wiki/Working_memory
 [dsl]: https://en.wikipedia.org/wiki/Domain-specific_language
