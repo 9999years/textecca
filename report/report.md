@@ -1,5 +1,33 @@
 # Textecca
 
+TeX is bad (or, at the very least, old). What do I mean by "bad"? And what's a
+better system look like? Here, we'll explore the design space of typesetting
+systems.
+
+It's difficult to talk about TeX's flaws without talking about its age.
+Computers, software, software development, and user interfaces have changed
+enormously in the 42 years since TeX's first release in 1978. [Your computer is
+not a fast PDP-11.][c-low-level] Computers have many conveniences that the
+first users of TeX made do without, such as "screens".
+
+TeX's design was heavily influenced by the constraints of computers in the
+1970s, most of which have largely vanished in a world where most computers have
+several cores, GHz clock speeds, gigabytes of RAM, terabytes of persistent
+storage, and high-resolution displays. We can now make different time-memory
+tradeoffs, leverage concurrency, and more to create a fluid and enjoyable user
+experience.
+
+TeX, unfortunately, does not perform a single function. TeX contains, wrapped
+into one tangled glob, a register-like virtual machine, a macro-based
+programming language and combined parser/evaluator, a layout and justification
+engine, and renderer.
+
+The box-and-glue model used by the layout engine and its accompanying
+justification algorithm remain best-in-class.
+
+One of the things I want to talk about here is "why is this such a hard
+problem?"
+
 ## Beyond plain text
 
 Using plain text for source code has certain limitations, so we create IDEs or
@@ -100,3 +128,4 @@ though physical paper makes this effortless).
 [working-memory]: https://en.wikipedia.org/wiki/Working_memory
 [dsl]: https://en.wikipedia.org/wiki/Domain-specific_language
 [wikiwand]: https://chrome.google.com/webstore/detail/wikiwand-wikipedia-modern/emffkefkbkpkgpdeeooapgaicgmcbolj
+[c-low-level]: https://queue.acm.org/detail.cfm?id=3212479
