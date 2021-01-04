@@ -28,6 +28,25 @@ justification algorithm remain best-in-class.
 One of the things I want to talk about here is "why is this such a hard
 problem?"
 
+
+## Boxes and Glue
+
+The most durable part of TeX is the venerable box-and-glue model used for
+describing layouts in terms of constraints. However, page layout is one of the
+least interesting aspects of TeX and document design in general to me --- and,
+more precisely, the restrictions of paper pages and designs (non-interactive,
+static, un-zoomable) are exactly what I want future systems to go beyond.
+
+## Charm and Humanism
+
+There is something peculiar about Donald Knuth as a person. I think his little
+witticisms are very annoying, and I exceptionally despise that the TeX users
+group has titled him "Grand Wizard", but there's a certain humanism (intimacy?)
+in TeX.
+
+It feels unfinished in a deliberate way. TeX has "whatsit"s and more, little
+things that seem to... just not be named.
+
 ## Beyond plain text
 
 Using plain text for source code has certain limitations, so we create IDEs or
@@ -72,19 +91,22 @@ language.
 
 ## DSLs
 
-- I believe TeX's support for [DSLs][dsl] is one of its greatest strengths. The
-  same flexibility that makes the macro system so intimidating, confusing, and
-  complicated allows package authors to embed nearly any language in TeX,
-  limited only by the package author's willingness to write code in TeX.
+I believe TeX's support for [DSLs][dsl] is one of its greatest strengths. The
+same flexibility that makes the macro system so intimidating, confusing, and
+complicated allows package authors to embed nearly any language in TeX, limited
+only by the package author's willingness to write code in TeX.
 
-- What would DSLs look like in non plain text? Would there be style
-  instructions? Does defining a DSL turn from a compiler problem to a GUI
-  problem?
+What would DSLs look like in non plain text? Would there be style instructions?
+Does defining a DSL turn from a compiler problem to a GUI problem?
 
-- If we remove the design constraint that plain-text code must be concise, that
-  is, by separating the input keystrokes from what the parser and compiler see,
-  we can create an interface that's less hellish for users, viewers, and
-  compilers.
+If we remove the design constraint that plain-text code must be concise, that
+is, by separating the input keystrokes from what the parser and compiler see,
+we can create an interface that's less hellish for users, viewers, and
+compilers.
+
+I spent so long thinking about syntax, and how syntax can uplift and create
+DSLs, but now I don't think plain-text syntax is even the answer, which
+transforms the questions of DSLs *dramatically.*
 
 ## Concept-based authoring
 
